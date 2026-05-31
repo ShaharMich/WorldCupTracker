@@ -10,12 +10,17 @@ import {
   fetchWCMatches,
   type FDTeam,
   type FDMatch,
+  type FDSquadMember,
 } from "@/lib/api/football-data";
-import { sleep } from "@/lib/utils";
+import { enrichPlayer } from "@/lib/api/thesportsdb";
+import { venueForMatch } from "@/lib/venues";
+import { sleep, normalizeFootballDataPosition, ageFromDateOfBirth } from "@/lib/utils";
 import type { AFPlayerResponse, AFStandingEntry } from "@/types/api";
 
 // API-Football free tier = 100 req/day; space out player calls.
 const RATE_LIMIT_MS = 300;
+// TheSportsDB free ("3") key is heavily throttled; pace enrichment lookups.
+const TSDB_RATE_LIMIT_MS = 500;
 
 type Logger = (msg: string) => void;
 const noop: Logger = () => {};
@@ -100,6 +105,9 @@ function mapFDTeam(team: FDTeam, groupCode: string | null) {
 }
 
 function mapFDMatch(m: FDMatch) {
+  // football-data's free WC feed carries no venue, so resolve it from our
+  // hardcoded catalog (lib/venues.ts). Prefer the API value if it ever appears.
+  const venue = venueForMatch(m.id);
   return {
     id: m.id,
     home_team_id: m.homeTeam.id,
@@ -107,9 +115,9 @@ function mapFDMatch(m: FDMatch) {
     kickoff_utc: m.utcDate,
     stage: fdStage(m.stage),
     group_code: fdGroupCode(m.group),
-    venue: m.venue,
-    city: null,
-    country: null,
+    venue: m.venue ?? venue?.name ?? null,
+    city: venue?.city ?? null,
+    country: venue?.country ?? null,
     status: fdStatus(m.status),
     elapsed: null,
     home_score: m.score.fullTime?.home ?? null,
@@ -267,6 +275,123 @@ export async function seedSquadsAndPlayers(
   }
 }
 
+// Base player row from a football-data squad member (no club/photo/stats).
+function mapFDPlayer(sp: FDSquadMember, teamId: number) {
+  return {
+    id: sp.id,
+    name: sp.name,
+    team_id: teamId,
+    nationality: sp.nationality,
+    position: normalizeFootballDataPosition(sp.position),
+    age: ageFromDateOfBirth(sp.dateOfBirth),
+    date_of_birth: sp.dateOfBirth,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+// Seeds players from football-data.org squads (free, no 2026 plan needed):
+// name, position, DOB, nationality. Then best-effort backfills photo + current
+// club from TheSportsDB. Logs how complete the enrichment ended up.
+export async function seedPlayersFromFootballData(log: Logger = noop): Promise<void> {
+  const db = getServerSupabase();
+  log("Fetching WC 2026 squads (football-data.org)...");
+  const { teams } = await fetchWCTeams();
+
+  const base: Array<ReturnType<typeof mapFDPlayer>> = [];
+  for (const team of teams) {
+    const squad = team.squad ?? [];
+    if (squad.length === 0) {
+      log(`  ${team.name}: no squad listed yet.`);
+      continue;
+    }
+    for (const sp of squad) base.push(mapFDPlayer(sp, team.id));
+  }
+
+  if (base.length === 0) {
+    log("No squad data returned (the draw/squads may not be published yet).");
+    return;
+  }
+
+  // 1) Upsert base rows first so we have data even if enrichment is throttled.
+  // Base rows only carry name/position/DOB/nationality/team — they never include
+  // photo_url/club_name, so this upsert preserves any enrichment from prior runs.
+  const { error: baseErr } = await db.from("players").upsert(base, { onConflict: "id" });
+  if (baseErr) throw new Error(`players base upsert failed: ${baseErr.message}`);
+  log(`Upserted ${base.length} base players across ${teams.length} teams. Enriching via TheSportsDB...`);
+
+  // 2) Resume support: skip players that were already enriched (have a photo or a
+  // club) on a previous run so a re-run only processes the remaining gaps. The
+  // enrichment step is the slow/throttled part, and the seed is interrupt-prone.
+  const { data: enrichedRows, error: enrichedErr } = await db
+    .from("players")
+    .select("id")
+    .or("photo_url.not.is.null,club_name.not.is.null");
+  if (enrichedErr) throw new Error(`players enriched lookup failed: ${enrichedErr.message}`);
+  const alreadyEnriched = new Set((enrichedRows ?? []).map((r) => r.id as number));
+  const todo = base.filter((row) => !alreadyEnriched.has(row.id));
+  log(
+    `Enrichment: ${alreadyEnriched.size} already have a photo/club (skipping), ` +
+      `${todo.length} remaining to process.`,
+  );
+
+  // 3) Best-effort enrichment of the remaining players.
+  let photos = 0;
+  let clubs = 0;
+  let badges = 0;
+  let processed = 0;
+  for (const row of todo) {
+    await sleep(TSDB_RATE_LIMIT_MS);
+    const e = await enrichPlayer(row.name);
+    processed++;
+    if (e.photo_url) photos++;
+    if (e.club_name) clubs++;
+    if (e.club_logo_url) badges++;
+
+    if (e.photo_url || e.club_name) {
+      const { error } = await db
+        .from("players")
+        .update({
+          photo_url: e.photo_url,
+          club_id: e.club_id,
+          club_name: e.club_name,
+          club_logo_url: e.club_logo_url,
+          club_country: e.club_country,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id);
+      if (error) log(`  enrich update failed for ${row.name}: ${error.message}`);
+    }
+
+    if (processed % 100 === 0) {
+      log(`  ...${processed}/${todo.length} processed (photos ${photos}, clubs ${clubs}).`);
+    }
+  }
+
+  // Final coverage is reported against the full squad set, not just this run's
+  // batch, so re-runs show cumulative progress.
+  const { count: total } = await db
+    .from("players")
+    .select("*", { count: "exact", head: true });
+  const { count: withPhoto } = await db
+    .from("players")
+    .select("*", { count: "exact", head: true })
+    .not("photo_url", "is", null);
+  const { count: withClub } = await db
+    .from("players")
+    .select("*", { count: "exact", head: true })
+    .not("club_name", "is", null);
+  const denom = total ?? base.length;
+  const pct = (n: number | null) =>
+    `${n ?? 0} (${Math.round(((n ?? 0) / denom) * 100)}%)`;
+  log(
+    `This run: processed ${todo.length} | new photos ${photos} | new clubs ${clubs} | ` +
+      `new badges ${badges}.`,
+  );
+  log(
+    `Coverage now: ${denom} players | photos ${pct(withPhoto)} | clubs ${pct(withClub)}.`,
+  );
+}
+
 export async function seedStandings(log: Logger = noop): Promise<void> {
   const db = getServerSupabase();
   log("Fetching group standings (API-Football)...");
@@ -301,17 +426,9 @@ export async function runSeed(
   opts: SeedOptions = { teams: true, players: true, fixtures: true, standings: true },
   log: Logger = noop,
 ): Promise<void> {
-  let teamIds: number[] = [];
-  if (opts.teams) teamIds = await seedTeams(log);
+  if (opts.teams) await seedTeams(log);
   if (opts.fixtures) await seedFixtures(log);
-  if (opts.players) {
-    if (teamIds.length === 0) {
-      const db = getServerSupabase();
-      const { data } = await db.from("teams").select("id");
-      teamIds = (data ?? []).map((t) => t.id as number);
-    }
-    await seedSquadsAndPlayers(teamIds, log);
-  }
+  if (opts.players) await seedPlayersFromFootballData(log);
   if (opts.standings) await seedStandings(log);
   log("Seed complete.");
 }

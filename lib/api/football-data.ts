@@ -29,12 +29,21 @@ async function fdFetch<T>(path: string): Promise<T> {
 
 // ---------- response shapes (only fields we use) ----------
 
+export interface FDSquadMember {
+  id: number;
+  name: string;
+  position: string | null; // "Goalkeeper" | "Defence" | "Centre-Back" | ...
+  dateOfBirth: string | null; // "1986-06-16"
+  nationality: string | null;
+}
+
 export interface FDTeam {
   id: number;
   name: string;
   shortName: string | null;
   tla: string | null;
   crest: string | null;
+  squad?: FDSquadMember[]; // included by /competitions/WC/teams
 }
 
 export interface FDTeamsResponse {

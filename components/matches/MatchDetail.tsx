@@ -116,7 +116,7 @@ export function MatchDetail({ initial }: { initial: MatchWithTeams }) {
           </div>
         </div>
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          {match.venue ?? "Venue TBD"}
+          {match.venue ?? "Stadium TBD"}
           {match.city ? ` · ${match.city}` : ""}
         </p>
       </div>

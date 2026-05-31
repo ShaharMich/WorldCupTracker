@@ -24,4 +24,5 @@ export const NAV_LINKS = [
   { href: "/teams", label: "Teams" },
   { href: "/groups", label: "Groups" },
   { href: "/matches", label: "Schedule" },
+  { href: "/stadiums", label: "Stadiums" },
 ] as const;

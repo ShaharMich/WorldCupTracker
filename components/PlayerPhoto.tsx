@@ -2,8 +2,11 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { User } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// Static, always-available silhouette used when a player has no photo or the
+// remote photo fails to load — guarantees we never render a broken image.
+const SILHOUETTE = "/player-silhouette.svg";
 
 interface Props {
   src: string | null;
@@ -14,29 +17,16 @@ interface Props {
 
 export function PlayerPhoto({ src, name, size = 48, className }: Props) {
   const [failed, setFailed] = useState(false);
-
-  if (!src || failed) {
-    return (
-      <span
-        className={cn(
-          "inline-flex items-center justify-center rounded-full bg-muted text-muted-foreground",
-          className,
-        )}
-        style={{ width: size, height: size }}
-        title={name}
-      >
-        <User style={{ width: size * 0.5, height: size * 0.5 }} />
-      </span>
-    );
-  }
+  const showFallback = !src || failed;
 
   return (
     <Image
-      src={src}
-      alt={name}
+      src={showFallback ? SILHOUETTE : src}
+      alt={showFallback ? `${name} (no photo available)` : name}
       width={size}
       height={size}
-      className={cn("rounded-full object-cover", className)}
+      title={name}
+      className={cn("rounded-full bg-muted object-cover", className)}
       onError={() => setFailed(true)}
       unoptimized
     />

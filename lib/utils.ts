@@ -69,6 +69,40 @@ export function positionGroup(position: string | null | undefined): string {
 
 export const POSITION_ORDER = ["Goalkeeper", "Defender", "Midfielder", "Attacker"];
 
+// football-data.org uses granular position labels (e.g. "Centre-Back",
+// "Defensive Midfield", "Offence"). Collapse them to the 4 canonical buckets
+// the squad UI groups by.
+export function normalizeFootballDataPosition(
+  position: string | null | undefined,
+): "Goalkeeper" | "Defender" | "Midfielder" | "Attacker" | null {
+  if (!position) return null;
+  const p = position.toLowerCase();
+  if (p.includes("keeper") || p === "gk") return "Goalkeeper";
+  if (p.includes("back") || p.includes("defen")) return "Defender";
+  if (p.includes("midfield")) return "Midfielder";
+  if (
+    p.includes("forward") ||
+    p.includes("winger") ||
+    p.includes("offen") ||
+    p.includes("striker") ||
+    p.includes("attack")
+  )
+    return "Attacker";
+  return null;
+}
+
+// Whole years between a yyyy-mm-dd date of birth and now.
+export function ageFromDateOfBirth(dob: string | null | undefined): number | null {
+  if (!dob) return null;
+  const birth = new Date(dob);
+  if (Number.isNaN(birth.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const m = now.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+  return age;
+}
+
 export function initials(name: string): string {
   return name
     .split(" ")

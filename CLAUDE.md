@@ -26,6 +26,10 @@ The app is built to be **public-facing** (not just personal), production-grade, 
 
 > **Active seed source (as of Phase 1 build):** **football-data.org is the primary source for teams + fixtures**, because API-Football's **free tier only exposes seasons 2022–2024** and rejects `season=2026` (`"Free plans do not have access to this season"`). football-data.org's free tier *does* include the WC competition. API-Football remains wired up for player club stats, live match events/stats/lineups, and standings — but those need a **paid API-Football plan** with 2026 access before they return data. Note football-data.org and API-Football use **different team IDs**, so player seeding (API-Football) won't match football-data-seeded teams without an ID cross-walk.
 
+> **Players are actually seeded from football-data squads + TheSportsDB enrichment (not API-Football yet):** `seedPlayersFromFootballData` upserts every squad member from `football-data /competitions/WC/teams` (name, position, DOB, nationality), then best-effort backfills photo + current club from **TheSportsDB**, filtered to `strSport === "Soccer"` so NFL/rugby namesakes never match (see `lib/api/thesportsdb.ts`). The free TheSportsDB `"3"` key has a rolling rate cap, so bulk enrichment is incomplete and resumable (skips already-enriched players). **Planned: replace TheSportsDB with API-Football for player enrichment on 2026-06-03.**
+
+> **Stadiums are hardcoded — football-data's free WC match feed has NO venue field:** there is no per-fixture venue in the API, so `lib/venues.ts` hardcodes the 16 stadiums (name, city, country, capacity, Wikimedia photo `imageUrl`) plus a `MATCH_VENUES` map of football-data match id → stadium for all 104 fixtures. The fixed anchors are correct (Azteca opener, MetLife final, host nations in their own cities); the rest is region-consistent but **flagged in-file as needing verification** against the official FIFA schedule. The `matches.venue`/`city`/`country` columns are populated from this catalog during the fixtures seed.
+
 ### Primary: API-Football
 - **Provider**: RapidAPI → api-sports/api-football
 - **Sign up**: https://rapidapi.com/api-sports/api/api-football
@@ -376,6 +380,11 @@ export async function getCached<T>(
 - Color code: top 2 = advance (green), 3rd = conditional (yellow)
 - Updates live after each match result
 
+### `/stadiums` & `/stadiums/[id]` — Stadiums
+- Listing: all 16 stadiums grouped by host country, each card with a Wikimedia photo thumbnail, city and capacity.
+- Detail: stadium hero photo, city, country, capacity, and every match assigned to it (via the `matches.venue` name).
+- Data is fully hardcoded in `lib/venues.ts` (no API). **UI label is "Stadium"; the DB column / code identifiers stay `venue`** (`VenueId`, `getVenue`, `venueForMatch`, `MATCH_VENUES`).
+
 ---
 
 ## Live Match Polling
@@ -410,11 +419,13 @@ Prereq: create `.env.local` (see `.env.local.example`) and run `supabase/schema.
 
 What each step currently does (see `lib/seed.ts`):
 1. **teams** — `football-data.org /competitions/WC/teams` → upsert 48 teams; group_code is derived from the group-stage fixtures (the teams endpoint has no group info).
-2. **fixtures** — `football-data.org /competitions/WC/matches` → upsert all 104 fixtures (stage/group/status mapped to our schema).
-3. **players** — API-Football squads + club stats. **Currently a no-op against football-data-seeded teams** (different team IDs + needs a paid 2026 plan). Wire an ID cross-walk before using.
+2. **fixtures** — `football-data.org /competitions/WC/matches` → upsert all 104 fixtures (stage/group/status mapped to our schema); **venue/city/country are filled from the hardcoded `lib/venues.ts` catalog** since the feed has no venue field.
+3. **players** — `seedPlayersFromFootballData`: upsert every football-data squad member, then enrich photo + club from **TheSportsDB (soccer-filtered)**. **Resumable** — re-runs skip players that already have a photo/club, so an interrupted run continues where it left off.
 4. **standings** — API-Football `/standings` (needs paid 2026 plan; pre-tournament the `/groups` page falls back to placeholder rows from the team list).
 
-The seed upserts (`ON CONFLICT DO UPDATE`) so re-runs are safe. Player seeding spaces calls with `sleep(300)` for rate limits.
+The seed upserts (`ON CONFLICT DO UPDATE`) so re-runs are safe. Player enrichment spaces TheSportsDB calls (~500ms) for rate limits.
+
+**Repairing enrichment** (`scripts/revalidate-enrichment.ts`): re-checks players against the soccer filter — a soccer match is kept/corrected, a confirmed non-match clears the row (UI falls back to the silhouette), and a transient fetch error **skips** the row (never wipes good data). Pass `enriched` to only re-check already-enriched rows; it retries rate-limited rows across rounds until none remain.
 
 **Rate limiting**: football-data.org free tier = 10 req/min (teams+fixtures is only a few calls). API-Football free tier = 100 req/day — and does **not** include season 2026, so a paid plan is required for players/standings/live.
 
@@ -434,22 +445,19 @@ The seed upserts (`ON CONFLICT DO UPDATE`) so re-runs are safe. Player seeding s
 
 ## Image Handling
 
-- **Player photos**: Use `player.photo` from API-Football (hosted on their CDN)
-- **Team logos**: Use `team.logo` from API-Football
-- **Country flags**: Use `https://flagcdn.com/w80/{country_code}.png` (free, no API key)
-- **Next.js config**: Add API-Football CDN to `next.config.js` `images.remotePatterns`
-- **Fallback**: Show a generic silhouette SVG if player photo fails to load
+- **Player photos**: Currently from **TheSportsDB** (soccer-filtered), stored as `players.photo_url`. The `PlayerPhoto` client component falls back to `public/player-silhouette.svg` on null/error, so a broken image never shows. (Switching to API-Football photos on 2026-06-03.)
+- **Team logos / crests**: `team.crest` from football-data.org (`crests.football-data.org`).
+- **Country flags**: `https://flagcdn.com/w{width}/{code}.png` (free, no API key) via `flagUrl()` in `lib/utils.ts`.
+- **Stadium photos**: hardcoded Wikimedia Commons URLs (`upload.wikimedia.org`) in `lib/venues.ts`, rendered by the `StadiumImage` client component (with an `onError` placeholder).
+- **Next.js config**: hostnames live in `next.config.ts` (note: `.ts`, not `.js`) `images.remotePatterns` — keep new image hosts in sync there. Images are rendered `unoptimized`.
 
-```js
-// next.config.js
-images: {
-  remotePatterns: [
-    { hostname: 'media.api-sports.io' },       // API-Football player photos
-    { hostname: 'media-1.api-sports.io' },
-    { hostname: 'flagcdn.com' },               // Country flags
-    { hostname: 'www.thesportsdb.com' },       // TheSportsDB images
-  ]
-}
+```ts
+// next.config.ts — images.remotePatterns hostnames
+media.api-sports.io / media-{1,2,3}.api-sports.io  // API-Football (future)
+flagcdn.com                                         // country flags
+crests.football-data.org                            // team crests
+www.thesportsdb.com / r2.thesportsdb.com            // player photos
+upload.wikimedia.org                                // stadium photos
 ```
 
 ---
@@ -498,6 +506,11 @@ npm run build && npm start
 # Seed Supabase (all steps, or pass a subset: teams fixtures players standings)
 npm run seed
 npm run seed -- teams fixtures
+npm run seed -- players            # resumable: skips already-enriched players
+
+# Repair/clean player enrichment against the soccer filter (see Seeding Strategy)
+npx tsx scripts/revalidate-enrichment.ts            # all players
+npx tsx scripts/revalidate-enrichment.ts enriched   # only already-enriched rows
 
 # Type checking
 npm run typecheck   # alias for: tsc --noEmit

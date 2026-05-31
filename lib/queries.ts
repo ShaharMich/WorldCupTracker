@@ -94,6 +94,17 @@ export async function getMatchesForTeam(teamId: number): Promise<MatchWithTeams[
   return attachTeams((data as Match[]) ?? [], await teamMap());
 }
 
+export async function getMatchesForVenue(venueName: string): Promise<MatchWithTeams[]> {
+  if (!isServerSupabaseConfigured()) return [];
+  const db = getServerSupabase();
+  const { data } = await db
+    .from("matches")
+    .select("*")
+    .eq("venue", venueName)
+    .order("kickoff_utc");
+  return attachTeams((data as Match[]) ?? [], await teamMap());
+}
+
 export async function getUpcomingMatches(limit = 5): Promise<MatchWithTeams[]> {
   if (!isServerSupabaseConfigured()) return [];
   const db = getServerSupabase();

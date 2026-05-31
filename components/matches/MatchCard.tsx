@@ -71,7 +71,10 @@ export function MatchCard({ match }: { match: MatchWithTeams }) {
       </div>
 
       <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-        <span className="truncate">{match.venue ?? "Venue TBD"}</span>
+        <span className="truncate">
+          {match.venue ?? "Stadium TBD"}
+          {match.city ? ` · ${match.city}` : ""}
+        </span>
         {!live && !finished ? <span>{formatKickoff(match.kickoff_utc)}</span> : null}
       </div>
     </Link>
