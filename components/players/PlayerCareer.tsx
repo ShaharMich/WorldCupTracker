@@ -17,9 +17,11 @@ export function PlayerCareer({ career }: { career: CareerClub[] | null }) {
           <div key={i} className="flex items-center justify-between px-3 py-2 text-sm">
             <span className="font-medium">{c.club}</span>
             <span className="text-muted-foreground">{c.season}</span>
-            <span className="tabular-nums text-muted-foreground">
-              {c.appearances ?? 0} apps · {c.goals ?? 0} g
-            </span>
+            {c.appearances != null || c.goals != null ? (
+              <span className="tabular-nums text-muted-foreground">
+                {c.appearances ?? 0} apps · {c.goals ?? 0} g
+              </span>
+            ) : null}
           </div>
         ))}
       </div>

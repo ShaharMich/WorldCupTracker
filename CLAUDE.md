@@ -24,9 +24,9 @@ The app is built to be **public-facing** (not just personal), production-grade, 
 
 ## APIs & Data Sources
 
-> **Active seed source (as of Phase 1 build):** **football-data.org is the primary source for teams + fixtures**, because API-Football's **free tier only exposes seasons 2022–2024** and rejects `season=2026` (`"Free plans do not have access to this season"`). football-data.org's free tier *does* include the WC competition. API-Football remains wired up for player club stats, live match events/stats/lineups, and standings — but those need a **paid API-Football plan** with 2026 access before they return data. Note football-data.org and API-Football use **different team IDs**, so player seeding (API-Football) won't match football-data-seeded teams without an ID cross-walk.
+> **Seed sources (updated 2026-06-07):** **football-data.org is the primary source for teams + fixtures** (its free tier includes the WC competition), and **API-Football (paid Pro plan, season 2026) is now the source for players + standings**. API-Football is also wired for live match events/stats/lineups. football-data.org and API-Football use **different team IDs**, so players are linked to football-data-seeded teams via a name-based **team crosswalk** (`buildTeamCrosswalk` in `lib/seed.ts`); standings team IDs are crosswalked the same way to satisfy the `standings.team_id → teams.id` FK. ⚠️ Do **not** re-seed teams/fixtures from API-Football — the stadium mapping (`MATCH_VENUES`) and `matches↔teams` relations are keyed to football-data match/team IDs.
 
-> **Players are actually seeded from football-data squads + TheSportsDB enrichment (not API-Football yet):** `seedPlayersFromFootballData` upserts every squad member from `football-data /competitions/WC/teams` (name, position, DOB, nationality), then best-effort backfills photo + current club from **TheSportsDB**, filtered to `strSport === "Soccer"` so NFL/rugby namesakes never match (see `lib/api/thesportsdb.ts`). The free TheSportsDB `"3"` key has a rolling rate cap, so bulk enrichment is incomplete and resumable (skips already-enriched players). **Planned: replace TheSportsDB with API-Football for player enrichment on 2026-06-03.**
+> **Players are seeded from API-Football (`seedPlayersFromApiFootball`):** for each team (resolved through the crosswalk) it pulls `/players/squads` (jersey #, position, photo, age), then enriches each player with `/players?id&season=2025` (bio, height/weight, 2025/26 club stats aggregated across competitions, current club) and `/transfers` (career history → `career_clubs`). **Resumable** — re-runs skip players that already have `career_clubs`. A stale-row sweep removes any player no longer in a squad. ⚠️ Both the stale sweep and the resume check **paginate via `allRowIds()`** because a Supabase `select()` caps at 1000 rows — without this, cleanup silently misses rows past the cap. TheSportsDB is **retired**; the old `seedPlayersFromFootballData`, `lib/api/thesportsdb.ts`, and `scripts/revalidate-enrichment.ts` are legacy and no longer wired into `runSeed`.
 
 > **Stadiums are hardcoded — football-data's free WC match feed has NO venue field:** there is no per-fixture venue in the API, so `lib/venues.ts` hardcodes the 16 stadiums (name, city, country, capacity, Wikimedia photo `imageUrl`) plus a `MATCH_VENUES` map of football-data match id → stadium for all 104 fixtures. The fixed anchors are correct (Azteca opener, MetLife final, host nations in their own cities); the rest is region-consistent but **flagged in-file as needing verification** against the official FIFA schedule. The `matches.venue`/`city`/`country` columns are populated from this catalog during the fixtures seed.
 
@@ -420,14 +420,14 @@ Prereq: create `.env.local` (see `.env.local.example`) and run `supabase/schema.
 What each step currently does (see `lib/seed.ts`):
 1. **teams** — `football-data.org /competitions/WC/teams` → upsert 48 teams; group_code is derived from the group-stage fixtures (the teams endpoint has no group info).
 2. **fixtures** — `football-data.org /competitions/WC/matches` → upsert all 104 fixtures (stage/group/status mapped to our schema); **venue/city/country are filled from the hardcoded `lib/venues.ts` catalog** since the feed has no venue field.
-3. **players** — `seedPlayersFromFootballData`: upsert every football-data squad member, then enrich photo + club from **TheSportsDB (soccer-filtered)**. **Resumable** — re-runs skip players that already have a photo/club, so an interrupted run continues where it left off.
-4. **standings** — API-Football `/standings` (needs paid 2026 plan; pre-tournament the `/groups` page falls back to placeholder rows from the team list).
+3. **players** — `seedPlayersFromApiFootball`: crosswalk teams → pull all 48 squads → drop stale rows → upsert base rows → enrich each player with API-Football detail (bio + 2025/26 club stats) and transfers (career). **Resumable** — re-runs skip players that already have `career_clubs`.
+4. **standings** — API-Football `/standings`, with team IDs crosswalked to our football-data team IDs (unmatched entries skipped). Pre-tournament rows are mostly zeros; the `/groups` page still falls back to placeholder rows from the team list when empty.
 
 The seed upserts (`ON CONFLICT DO UPDATE`) so re-runs are safe. Player enrichment spaces TheSportsDB calls (~500ms) for rate limits.
 
 **Repairing enrichment** (`scripts/revalidate-enrichment.ts`): re-checks players against the soccer filter — a soccer match is kept/corrected, a confirmed non-match clears the row (UI falls back to the silhouette), and a transient fetch error **skips** the row (never wipes good data). Pass `enriched` to only re-check already-enriched rows; it retries rate-limited rows across rounds until none remain.
 
-**Rate limiting**: football-data.org free tier = 10 req/min (teams+fixtures is only a few calls). API-Football free tier = 100 req/day — and does **not** include season 2026, so a paid plan is required for players/standings/live.
+**Rate limiting**: football-data.org free tier = 10 req/min (teams+fixtures is only a few calls). API-Football **Pro plan = 7,500 req/day**; a full player seed is ~2,550 calls (48 squads + ~1,248 players × 2 for detail + transfers). The seed paces calls with a short `sleep` (`RATE_LIMIT_MS`) between requests.
 
 ---
 
@@ -445,7 +445,7 @@ The seed upserts (`ON CONFLICT DO UPDATE`) so re-runs are safe. Player enrichmen
 
 ## Image Handling
 
-- **Player photos**: Currently from **TheSportsDB** (soccer-filtered), stored as `players.photo_url`. The `PlayerPhoto` client component falls back to `public/player-silhouette.svg` on null/error, so a broken image never shows. (Switching to API-Football photos on 2026-06-03.)
+- **Player photos**: from **API-Football** (`media.api-sports.io`), stored as `players.photo_url` (100% coverage at last seed). The `PlayerPhoto` client component falls back to `public/player-silhouette.svg` on null/error, so a broken image never shows.
 - **Team logos / crests**: `team.crest` from football-data.org (`crests.football-data.org`).
 - **Country flags**: `https://flagcdn.com/w{width}/{code}.png` (free, no API key) via `flagUrl()` in `lib/utils.ts`.
 - **Stadium photos**: hardcoded Wikimedia Commons URLs (`upload.wikimedia.org`) in `lib/venues.ts`, rendered by the `StadiumImage` client component (with an `onError` placeholder).
@@ -524,7 +524,7 @@ npx shadcn@latest add [component]
 ## Notes for Claude Code
 
 - Always check Supabase cache before making an external API call
-- During seeding, respect API-Football rate limits: `await sleep(300)` between requests
+- During seeding, respect API-Football rate limits: the seed sleeps `RATE_LIMIT_MS` (~150ms) between requests; the Pro plan allows 7,500/day
 - All times should be stored as UTC in Supabase and displayed in user local time using `Intl.DateTimeFormat`
 - The API-Football "status" field values: `NS`=Not Started, `1H`=First Half, `HT`=Half Time, `2H`=Second Half, `ET`=Extra Time, `BT`=Break in Extra Time, `P`=Penalties, `FT`=Full Time, `AET`=After Extra Time, `PEN`=After Penalties, `PST`=Postponed, `CANC`=Cancelled
 - Player positions from API-Football: `Goalkeeper`, `Defender`, `Midfielder`, `Attacker`

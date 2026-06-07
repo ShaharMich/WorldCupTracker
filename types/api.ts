@@ -76,6 +76,21 @@ export interface AFPlayerResponse {
   statistics: AFPlayerStatistics[];
 }
 
+export interface AFTransferMove {
+  date: string | null;
+  type: string | null; // fee or "Free"/"Loan"
+  teams: {
+    in: { id: number | null; name: string | null; logo: string | null };
+    out: { id: number | null; name: string | null; logo: string | null };
+  };
+}
+
+export interface AFTransferResponse {
+  player: { id: number; name: string };
+  update: string;
+  transfers: AFTransferMove[];
+}
+
 export interface AFFixture {
   fixture: {
     id: number;
