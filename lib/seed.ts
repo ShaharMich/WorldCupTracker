@@ -4,6 +4,7 @@ import {
   fetchSquad,
   fetchPlayer,
   fetchTransfers,
+  fetchCoaches,
   fetchStandings,
   CLUB_SEASON,
 } from "@/lib/api/api-football";
@@ -507,6 +508,56 @@ export async function seedPlayersFromApiFootball(log: Logger = noop): Promise<vo
   log(`Coverage now: ${denom} players | photos ${pct(photos)} | clubs ${pct(clubs)} | careers ${pct(careers)}.`);
 }
 
+// Seeds each team's current head coach (name, photo, nationality) from
+// API-Football. Coaches are keyed by API-Football team id, so we go through the
+// crosswalk and write onto our football-data-keyed teams rows.
+export async function seedCoaches(log: Logger = noop): Promise<void> {
+  const db = getServerSupabase();
+  log("Seeding team coaches (API-Football)...");
+  const { pairs } = await buildTeamCrosswalk(log);
+  if (pairs.length === 0) {
+    log("No teams matched — run the teams step first.");
+    return;
+  }
+
+  let found = 0;
+  let withPhoto = 0;
+  for (const { fdId, afId, name } of pairs) {
+    await sleep(RATE_LIMIT_MS);
+    try {
+      const coaches = await fetchCoaches(afId);
+      // The current coach has a career entry for THIS team with no end date;
+      // fall back to any current role, then to the first result.
+      const current =
+        coaches.find((c) =>
+          (c.career ?? []).some((e) => e.team?.id === afId && e.end === null),
+        ) ??
+        coaches.find((c) => (c.career ?? []).some((e) => e.end === null)) ??
+        coaches[0];
+      if (!current) {
+        log(`  ${name}: no coach listed.`);
+        continue;
+      }
+      found++;
+      if (current.photo) withPhoto++;
+      const { error } = await db
+        .from("teams")
+        .update({
+          coach_id: current.id,
+          coach_name: current.name,
+          coach_photo_url: current.photo,
+          coach_nationality: current.nationality,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", fdId);
+      if (error) log(`  ${name}: update failed: ${error.message}`);
+    } catch (e) {
+      log(`  ${name}: coach fetch failed: ${(e as Error).message}`);
+    }
+  }
+  log(`Coaches: ${found}/${pairs.length} teams have a coach (${withPhoto} with a photo).`);
+}
+
 export async function seedStandings(log: Logger = noop): Promise<void> {
   const db = getServerSupabase();
   log("Fetching group standings (API-Football)...");
@@ -543,16 +594,24 @@ export interface SeedOptions {
   teams?: boolean;
   players?: boolean;
   fixtures?: boolean;
+  coaches?: boolean;
   standings?: boolean;
 }
 
 export async function runSeed(
-  opts: SeedOptions = { teams: true, players: true, fixtures: true, standings: true },
+  opts: SeedOptions = {
+    teams: true,
+    players: true,
+    fixtures: true,
+    coaches: true,
+    standings: true,
+  },
   log: Logger = noop,
 ): Promise<void> {
   if (opts.teams) await seedTeams(log);
   if (opts.fixtures) await seedFixtures(log);
   if (opts.players) await seedPlayersFromApiFootball(log);
+  if (opts.coaches) await seedCoaches(log);
   if (opts.standings) await seedStandings(log);
   log("Seed complete.");
 }

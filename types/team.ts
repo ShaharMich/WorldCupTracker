@@ -15,6 +15,10 @@ export interface Team {
   confederation: string | null;
   wc_appearances: number | null;
   wc_titles: number;
+  coach_id: number | null;
+  coach_name: string | null;
+  coach_photo_url: string | null;
+  coach_nationality: string | null;
   api_data: unknown | null;
   updated_at: string;
 }

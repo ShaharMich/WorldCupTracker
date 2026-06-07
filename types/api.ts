@@ -76,6 +76,24 @@ export interface AFPlayerResponse {
   statistics: AFPlayerStatistics[];
 }
 
+export interface AFCoachCareer {
+  team: { id: number | null; name: string | null; logo: string | null };
+  start: string | null;
+  end: string | null; // null = current role
+}
+
+export interface AFCoach {
+  id: number;
+  name: string;
+  firstname: string | null;
+  lastname: string | null;
+  age: number | null;
+  nationality: string | null;
+  photo: string | null;
+  team: { id: number | null; name: string | null } | null;
+  career: AFCoachCareer[] | null;
+}
+
 export interface AFTransferMove {
   date: string | null;
   type: string | null; // fee or "Free"/"Loan"

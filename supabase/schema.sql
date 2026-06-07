@@ -28,9 +28,20 @@ CREATE TABLE IF NOT EXISTS teams (
   confederation TEXT,
   wc_appearances INTEGER,
   wc_titles INTEGER DEFAULT 0,
+  coach_id INTEGER,
+  coach_name TEXT,
+  coach_photo_url TEXT,
+  coach_nationality TEXT,
   api_data JSONB,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration for existing databases (CREATE TABLE above won't alter an existing
+-- teams table). Safe to re-run.
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS coach_id INTEGER;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS coach_name TEXT;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS coach_photo_url TEXT;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS coach_nationality TEXT;
 
 -- ------------------------------------------------------------
 -- 3. Players

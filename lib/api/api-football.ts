@@ -9,6 +9,7 @@ import type {
   AFFixtureEvent,
   AFLineupEntry,
   AFTransferResponse,
+  AFCoach,
 } from "@/types/api";
 
 const BASE_URL = "https://v3.football.api-sports.io";
@@ -70,6 +71,11 @@ export function fetchPlayer(
 // Player career history (club moves with dates + fees).
 export function fetchTransfers(playerId: number): Promise<AFTransferResponse[]> {
   return afFetch<AFTransferResponse>("/transfers", { player: playerId });
+}
+
+// Coaches who have managed a team (the current one has a career entry with end=null).
+export function fetchCoaches(teamId: number): Promise<AFCoach[]> {
+  return afFetch<AFCoach>("/coachs", { team: teamId });
 }
 
 export function fetchFixtures(): Promise<AFFixture[]> {

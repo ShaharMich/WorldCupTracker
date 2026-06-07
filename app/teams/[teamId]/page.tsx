@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TeamBadge } from "@/components/TeamBadge";
+import { PlayerPhoto } from "@/components/PlayerPhoto";
 import { SquadTable } from "@/components/teams/SquadTable";
 import { StandingsTable } from "@/components/groups/StandingsTable";
 import { MatchCard } from "@/components/matches/MatchCard";
@@ -43,7 +44,7 @@ export default async function TeamDetailPage({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-8 flex items-center gap-4">
+      <div className="mb-8 flex flex-wrap items-center gap-4">
         <TeamBadge team={team} size={56} />
         <div>
           <h1 className="text-3xl font-bold">{team.name}</h1>
@@ -54,6 +55,20 @@ export default async function TeamDetailPage({
             {team.wc_titles ? ` · ${team.wc_titles} titles` : ""}
           </p>
         </div>
+        {team.coach_name ? (
+          <div className="flex items-center gap-3 sm:ml-auto">
+            <PlayerPhoto src={team.coach_photo_url} name={team.coach_name} size={48} />
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Coach
+              </p>
+              <p className="font-medium leading-tight">{team.coach_name}</p>
+              {team.coach_nationality ? (
+                <p className="text-xs text-muted-foreground">{team.coach_nationality}</p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">

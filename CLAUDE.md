@@ -207,6 +207,10 @@ CREATE TABLE teams (
   confederation TEXT,         -- UEFA, CONMEBOL, CAF, etc.
   wc_appearances INTEGER,
   wc_titles INTEGER DEFAULT 0,
+  coach_id INTEGER,           -- API-Football coach id
+  coach_name TEXT,            -- current head coach
+  coach_photo_url TEXT,       -- media.api-sports.io coach photo
+  coach_nationality TEXT,
   api_data JSONB,             -- raw API-Football response
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -350,6 +354,7 @@ export async function getCached<T>(
 - Click player → Player profile
 - Team's match schedule: all 3 group matches + knockout path
 - Historical stats: WC appearances, best finish, titles
+- Head coach: photo, name, nationality (in the team header)
 
 ### `/players/[playerId]` — Player Profile
 - Large photo, name, nationality flag, jersey number
@@ -421,7 +426,8 @@ What each step currently does (see `lib/seed.ts`):
 1. **teams** — `football-data.org /competitions/WC/teams` → upsert 48 teams; group_code is derived from the group-stage fixtures (the teams endpoint has no group info).
 2. **fixtures** — `football-data.org /competitions/WC/matches` → upsert all 104 fixtures (stage/group/status mapped to our schema); **venue/city/country are filled from the hardcoded `lib/venues.ts` catalog** since the feed has no venue field.
 3. **players** — `seedPlayersFromApiFootball`: crosswalk teams → pull all 48 squads → drop stale rows → upsert base rows → enrich each player with API-Football detail (bio + 2025/26 club stats) and transfers (career). **Resumable** — re-runs skip players that already have `career_clubs`.
-4. **standings** — API-Football `/standings`, with team IDs crosswalked to our football-data team IDs (unmatched entries skipped). Pre-tournament rows are mostly zeros; the `/groups` page still falls back to placeholder rows from the team list when empty.
+4. **coaches** — `seedCoaches`: per team (via the crosswalk) fetch API-Football `/coachs`, pick the current coach (career entry with `end=null`), and write `coach_name`/`coach_photo_url`/`coach_nationality`/`coach_id` onto the teams row. 48/48 coverage at last run.
+5. **standings** — API-Football `/standings`, with team IDs crosswalked to our football-data team IDs (unmatched entries skipped). Pre-tournament rows are mostly zeros; the `/groups` page still falls back to placeholder rows from the team list when empty.
 
 The seed upserts (`ON CONFLICT DO UPDATE`) so re-runs are safe. Player enrichment spaces TheSportsDB calls (~500ms) for rate limits.
 
@@ -446,6 +452,7 @@ The seed upserts (`ON CONFLICT DO UPDATE`) so re-runs are safe. Player enrichmen
 ## Image Handling
 
 - **Player photos**: from **API-Football** (`media.api-sports.io`), stored as `players.photo_url` (100% coverage at last seed). The `PlayerPhoto` client component falls back to `public/player-silhouette.svg` on null/error, so a broken image never shows.
+- **Coach photos**: from **API-Football** (`media.api-sports.io/football/coachs/...`), stored as `teams.coach_photo_url`; rendered on the team detail page with the same `PlayerPhoto` silhouette fallback.
 - **Team logos / crests**: `team.crest` from football-data.org (`crests.football-data.org`).
 - **Country flags**: `https://flagcdn.com/w{width}/{code}.png` (free, no API key) via `flagUrl()` in `lib/utils.ts`.
 - **Stadium photos**: hardcoded Wikimedia Commons URLs (`upload.wikimedia.org`) in `lib/venues.ts`, rendered by the `StadiumImage` client component (with an `onError` placeholder).
@@ -507,6 +514,7 @@ npm run build && npm start
 npm run seed
 npm run seed -- teams fixtures
 npm run seed -- players            # resumable: skips already-enriched players
+npm run seed -- coaches            # current head coach (name, photo, nationality) per team
 
 # Repair/clean player enrichment against the soccer filter (see Seeding Strategy)
 npx tsx scripts/revalidate-enrichment.ts            # all players
