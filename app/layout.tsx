@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { RouteProgress } from "@/components/layout/RouteProgress";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/seo";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -58,6 +59,7 @@ export default function RootLayout({
       className={cn("h-full antialiased", geistMono.variable, inter.variable, "font-sans")}
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">
+        <RouteProgress />
         <Navbar />
         <main className="flex-1">{children}</main>
         <Footer />

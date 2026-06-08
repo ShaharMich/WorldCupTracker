@@ -17,7 +17,9 @@ The app is built to be **public-facing** (not just personal), production-grade, 
 
 **SEO / Open Graph:** `lib/seo.ts` exports `SITE_URL`/`SITE_NAME`/`SITE_DESCRIPTION` and a `pageMetadata({title,description,path})` helper that emits matching `openGraph` + `twitter` (`summary_large_image`) tags; the root layout sets `metadataBase`, title template, and default OG/Twitter. The shared social image is `app/opengraph-image.tsx` — a 1200×630 `next/og` `ImageResponse` (navy/gold, site title + URL) inherited by every route. Major listing pages (`/teams`, `/matches`, `/groups`, `/bracket`, `/stats`, `/stadiums`) use `pageMetadata`. Set `NEXT_PUBLIC_APP_URL` to the production domain so absolute OG URLs resolve (falls back to a vercel URL otherwise).
 
-**TeamCard** no longer shows an in-card group-letter badge — the group header above the grid already labels it. **Favicon** is a ⚽ emoji SVG at `app/icon.svg` (the old `favicon.ico` was removed; Next.js App Router auto-serves `icon.svg`).
+**TeamCard** no longer shows an in-card group-letter badge — the group header above the grid already labels it.
+
+**Route progress bar:** `components/layout/RouteProgress.tsx` (client, mounted in the root layout) renders a thin gold (`bg-gold`) top bar during client navigations. The App Router has no route events, so it starts on internal `<a>` clicks + `popstate` and completes when `usePathname()` changes (with a 10s safety timeout so it never sticks). **Favicon** is a ⚽ emoji SVG at `app/icon.svg` (the old `favicon.ico` was removed; Next.js App Router auto-serves `icon.svg`).
 - **Database**: Supabase (PostgreSQL) — caching, data persistence, seeding
 - **Deployment**: Vercel
 - **Mobile (Phase 2)**: Capacitor wrapping the Next.js export
