@@ -572,7 +572,8 @@ npx shadcn@latest add [component]
 
 - Always check Supabase cache before making an external API call
 - During seeding, respect API-Football rate limits: the seed sleeps `RATE_LIMIT_MS` (~150ms) between requests; the Pro plan allows 7,500/day
-- All times should be stored as UTC in Supabase and displayed in user local time using `Intl.DateTimeFormat`
+- All times are stored as UTC in Supabase and shown in the **visitor's local time zone** via the **`components/LocalTime.tsx`** client component (`mode="time"|"datetime"|"day"`). It must be a client component because server components render in the server's zone (UTC on Vercel), which would be wrong for everyone else. SSR/first paint use a deterministic en-US/UTC value, then `useEffect` swaps to the local zone (no hydration mismatch). Use `LocalTime` for any new timestamp display — don't format times directly in a server component.
+- Opening-match countdown target is `WC.openingMatchUtc` in `lib/constants.ts` (`2026-06-11T20:00:00Z`, Mexico vs South Africa) and the matching fixture row (`matches.id 537327`) was set to the same `20:00Z` — keep the two in sync if the official kickoff changes.
 - The API-Football "status" field values: `NS`=Not Started, `1H`=First Half, `HT`=Half Time, `2H`=Second Half, `ET`=Extra Time, `BT`=Break in Extra Time, `P`=Penalties, `FT`=Full Time, `AET`=After Extra Time, `PEN`=After Penalties, `PST`=Postponed, `CANC`=Cancelled
 - Player positions from API-Football: `Goalkeeper`, `Defender`, `Midfielder`, `Attacker`
 - Always handle missing/null player photos gracefully with a fallback image

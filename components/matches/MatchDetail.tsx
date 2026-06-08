@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { TeamBadge } from "@/components/TeamBadge";
+import { LocalTime } from "@/components/LocalTime";
 import { LiveBadge } from "@/components/matches/LiveBadge";
 import { MatchStats } from "@/components/matches/MatchStats";
 import { MatchEvents } from "@/components/matches/MatchEvents";
-import { formatKickoff } from "@/lib/utils";
 import { isLiveStatus, isFinishedStatus, type MatchWithTeams, type TeamLineup } from "@/types/match";
 
 function Lineups({ lineups }: { lineups: TeamLineup[] | null }) {
@@ -101,7 +101,7 @@ export function MatchDetail({ initial }: { initial: MatchWithTeams }) {
               <span className="text-sm font-medium text-muted-foreground">Full Time</span>
             ) : (
               <span className="text-sm text-muted-foreground">
-                {formatKickoff(match.kickoff_utc)}
+                <LocalTime utc={match.kickoff_utc} mode="datetime" />
               </span>
             )}
             {match.home_score_pen != null && match.away_score_pen != null ? (

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
+import { LocalTime } from "@/components/LocalTime";
 import { LiveBadge } from "@/components/matches/LiveBadge";
-import { formatKickoff, formatKickoffTime } from "@/lib/utils";
 import { isLiveStatus, isFinishedStatus, type MatchWithTeams } from "@/types/match";
 
 // `showDate` controls the footer date: on by default (home, team & stadium
@@ -11,11 +11,6 @@ export function MatchCard({ match, showDate = true }: { match: MatchWithTeams; s
   const live = isLiveStatus(match.status);
   const finished = isFinishedStatus(match.status);
   const hasScore = match.home_score != null && match.away_score != null;
-
-  // Centre value: score when we have one, otherwise the kickoff time.
-  const center = hasScore
-    ? `${match.home_score} - ${match.away_score}`
-    : formatKickoffTime(match.kickoff_utc);
 
   return (
     <Link
@@ -48,7 +43,11 @@ export function MatchCard({ match, showDate = true }: { match: MatchWithTeams; s
         </span>
 
         <span className="shrink-0 px-1 text-center text-base font-bold tabular-nums leading-tight">
-          {center}
+          {hasScore ? (
+            `${match.home_score} - ${match.away_score}`
+          ) : (
+            <LocalTime utc={match.kickoff_utc} mode="time" />
+          )}
         </span>
 
         <span className="flex-1 text-balance break-words text-left text-sm font-semibold leading-tight">
@@ -68,7 +67,9 @@ export function MatchCard({ match, showDate = true }: { match: MatchWithTeams; s
           {match.city ? ` · ${match.city}` : ""}
         </span>
         {showDate && !live ? (
-          <span className="shrink-0">{formatKickoff(match.kickoff_utc)}</span>
+          <span className="shrink-0">
+            <LocalTime utc={match.kickoff_utc} mode="datetime" />
+          </span>
         ) : null}
       </div>
     </Link>
