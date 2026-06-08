@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { NAV_LINKS } from "@/lib/constants";
+import { MobileNav } from "@/components/layout/MobileNav";
 
 export function Navbar() {
   return (
@@ -10,21 +11,24 @@ export function Navbar() {
           <span className="grid size-8 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
             <Trophy className="size-4.5" />
           </span>
-          <span className="hidden text-gradient-gold sm:inline">World Cup 2026</span>
-          <span className="text-gradient-gold sm:hidden">WC26</span>
+          <span className="text-gradient-gold">World Cup 2026</span>
         </Link>
-        <ul className="flex items-center gap-0.5 text-sm font-medium">
+
+        {/* Inline links at md+; hamburger below md. */}
+        <ul className="hidden items-center gap-0.5 text-sm font-medium md:flex">
           {NAV_LINKS.map((link) => (
             <li key={link.href}>
               <Link
                 href={link.href}
-                className="rounded-md px-2.5 py-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:px-3"
+                className="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               >
                 {link.label}
               </Link>
             </li>
           ))}
         </ul>
+
+        <MobileNav />
       </nav>
     </header>
   );

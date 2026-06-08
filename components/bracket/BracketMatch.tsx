@@ -45,7 +45,7 @@ export function BracketMatch({ match }: { match: MatchWithTeams }) {
   return (
     <Link
       href={`/matches/${match.id}`}
-      className="group block w-56 overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all hover:border-primary/60 hover:shadow-md hover:shadow-primary/10"
+      className="group block w-44 overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all hover:border-primary/60 hover:shadow-md hover:shadow-primary/10"
     >
       <div className="divide-y divide-border">
         <Slot team={match.home_team} goals={hasScore ? match.home_score : null} winner={!awayWin} />

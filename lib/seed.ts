@@ -194,6 +194,22 @@ function clubKey(name: string): string {
   return name.toLowerCase().normalize("NFD").replace(/[^a-z0-9]/g, "");
 }
 
+// Standardizes career `season` fields to consistent year ranges. Input is a
+// newest-first list whose `season` holds at least a start year (a bare "2021" or
+// an existing range like "2004–2021"). Each club's end year is the start year of
+// the next (newer) club — i.e. when the player left it. The current club (index
+// 0) and any club with no known successor year render open-ended ("2023–").
+// Uses an en dash (–) throughout.
+export function withSeasonRanges<T extends { season: string }>(career: T[]): T[] {
+  const startYear = (s: string) => s.match(/\d{4}/)?.[0] ?? "";
+  return career.map((c, i) => {
+    const start = startYear(c.season);
+    if (!start) return { ...c, season: "" };
+    const end = i > 0 ? startYear(career[i - 1].season) : "";
+    return { ...c, season: end ? `${start}–${end}` : `${start}–` };
+  });
+}
+
 // Builds a career timeline (newest first) from transfer history. Per-club
 // appearance/goal totals aren't available from /transfers, so they stay null;
 // the UI renders the club + year and omits the counts when null. Consecutive
@@ -219,7 +235,7 @@ function buildCareer(transfers: AFTransferResponse[]) {
     if (prev && clubKey(prev.club) === clubKey(c.club)) continue; // keep newest
     career.push(c);
   }
-  return career.length > 0 ? career : null;
+  return career.length > 0 ? withSeasonRanges(career) : null;
 }
 
 // The player's most recent transfer destination (with team id + logo), used to

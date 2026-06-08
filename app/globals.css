@@ -159,8 +159,12 @@
 }
 
 .text-gradient-gold {
-  background: linear-gradient(90deg, var(--gold-bright), var(--gold) 55%, oklch(0.7 0.13 60));
+  /* Use background-image (not the `background` shorthand): the shorthand resets
+     background-clip to border-box, and the build emits a wide-gamut fallback rule
+     that would re-set it and break the text clip (showing a solid gold box). */
+  background-image: linear-gradient(90deg, var(--gold-bright), var(--gold) 55%, oklch(0.7 0.13 60));
   -webkit-background-clip: text;
   background-clip: text;
+  -webkit-text-fill-color: transparent;
   color: transparent;
 }
