@@ -1,9 +1,14 @@
-import type { Metadata } from "next";
 import { MatchList } from "@/components/matches/MatchList";
 import { SetupNotice } from "@/components/EmptyState";
 import { getAllMatches } from "@/lib/queries";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Schedule" };
+export const metadata = pageMetadata({
+  title: "Schedule",
+  description:
+    "Every fixture and result at the FIFA World Cup 2026 — filter by round, day, team or live status.",
+  path: "/matches",
+});
 export const revalidate = 60;
 
 export default async function MatchesPage() {

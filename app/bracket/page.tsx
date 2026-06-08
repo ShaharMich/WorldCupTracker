@@ -1,10 +1,14 @@
-import type { Metadata } from "next";
 import { BracketMatch } from "@/components/bracket/BracketMatch";
 import { SetupNotice } from "@/components/EmptyState";
 import { getKnockoutMatches } from "@/lib/queries";
 import type { MatchWithTeams } from "@/types/match";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Bracket" };
+export const metadata = pageMetadata({
+  title: "Bracket",
+  description: "The full FIFA World Cup 2026 knockout bracket, from the Round of 32 to the Final.",
+  path: "/bracket",
+});
 export const revalidate = 60;
 
 // Splits a round's matches into [leftHalf, rightHalf] for the two-sided bracket.

@@ -23,12 +23,6 @@ export function TeamCard({ team }: { team: Team }) {
         />
       ) : null}
 
-      {team.group_code ? (
-        <span className="absolute left-3 top-3 rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-          {team.group_code}
-        </span>
-      ) : null}
-
       <div className="relative grid size-16 place-items-center rounded-full bg-secondary/50 ring-1 ring-border transition-transform duration-200 group-hover:scale-110">
         <TeamBadge team={team} size={44} />
       </div>

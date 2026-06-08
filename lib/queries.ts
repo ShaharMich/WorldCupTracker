@@ -47,6 +47,40 @@ export async function getSquad(teamId: number): Promise<Player[]> {
   return (data as Player[]) ?? [];
 }
 
+export type PlayerWithTeam = Player & { team: Team | null };
+
+// Top scorers + assisters for the tournament, derived from players.stats_wc.
+// Returns empty lists pre-tournament (no player has stats_wc yet).
+export async function getStatLeaders(
+  limit = 20,
+): Promise<{ scorers: PlayerWithTeam[]; assisters: PlayerWithTeam[] }> {
+  if (!isServerSupabaseConfigured()) return { scorers: [], assisters: [] };
+  const db = getServerSupabase();
+  const { data } = await db.from("players").select("*").not("stats_wc", "is", null);
+  const players = (data as Player[]) ?? [];
+  if (players.length === 0) return { scorers: [], assisters: [] };
+
+  const teams = await teamMap();
+  const withTeam: PlayerWithTeam[] = players.map((p) => ({
+    ...p,
+    team: p.team_id ? teams.get(p.team_id) ?? null : null,
+  }));
+
+  const goals = (p: PlayerWithTeam) => p.stats_wc?.goals ?? 0;
+  const assists = (p: PlayerWithTeam) => p.stats_wc?.assists ?? 0;
+
+  const scorers = withTeam
+    .filter((p) => goals(p) > 0)
+    .sort((a, b) => goals(b) - goals(a) || assists(b) - assists(a) || a.name.localeCompare(b.name))
+    .slice(0, limit);
+  const assisters = withTeam
+    .filter((p) => assists(p) > 0)
+    .sort((a, b) => assists(b) - assists(a) || goals(b) - goals(a) || a.name.localeCompare(b.name))
+    .slice(0, limit);
+
+  return { scorers, assisters };
+}
+
 export async function getPlayer(id: number): Promise<Player | null> {
   if (!isServerSupabaseConfigured()) return null;
   const db = getServerSupabase();

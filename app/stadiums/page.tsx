@@ -1,12 +1,17 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { MapPin, Users } from "lucide-react";
 import { StadiumImage } from "@/components/StadiumImage";
 import { VENUES, type HostCountry } from "@/lib/venues";
 import { flagUrl } from "@/lib/utils";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Stadiums" };
+export const metadata = pageMetadata({
+  title: "Stadiums",
+  description:
+    "All 16 host stadiums across the USA, Canada and Mexico for the FIFA World Cup 2026.",
+  path: "/stadiums",
+});
 
 const COUNTRY_CODE: Record<HostCountry, string> = { USA: "us", Mexico: "mx", Canada: "ca" };
 const COUNTRY_ORDER: HostCountry[] = ["USA", "Mexico", "Canada"];

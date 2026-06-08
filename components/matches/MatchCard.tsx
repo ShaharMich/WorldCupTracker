@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
 import { LiveBadge } from "@/components/matches/LiveBadge";
-import { formatKickoffTime } from "@/lib/utils";
+import { formatKickoff, formatKickoffTime } from "@/lib/utils";
 import { isLiveStatus, isFinishedStatus, type MatchWithTeams } from "@/types/match";
 
-export function MatchCard({ match }: { match: MatchWithTeams }) {
+// `showDate` controls the footer date: on by default (home, team & stadium
+// fixtures), turned off on the schedule page where the day-section header
+// already carries the date.
+export function MatchCard({ match, showDate = true }: { match: MatchWithTeams; showDate?: boolean }) {
   const live = isLiveStatus(match.status);
   const finished = isFinishedStatus(match.status);
   const hasScore = match.home_score != null && match.away_score != null;
@@ -59,11 +62,14 @@ export function MatchCard({ match }: { match: MatchWithTeams }) {
         />
       </div>
 
-      <div className="mt-3 border-t border-border pt-2 text-xs text-muted-foreground">
-        <span className="block truncate">
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-2 text-xs text-muted-foreground">
+        <span className="truncate">
           {match.venue ?? "Stadium TBD"}
           {match.city ? ` · ${match.city}` : ""}
         </span>
+        {showDate && !live ? (
+          <span className="shrink-0">{formatKickoff(match.kickoff_utc)}</span>
+        ) : null}
       </div>
     </Link>
   );

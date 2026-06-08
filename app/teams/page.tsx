@@ -1,9 +1,14 @@
-import type { Metadata } from "next";
 import { TeamGrid } from "@/components/teams/TeamGrid";
 import { SetupNotice } from "@/components/EmptyState";
 import { getTeamsByGroup } from "@/lib/queries";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Teams" };
+export const metadata = pageMetadata({
+  title: "Teams",
+  description:
+    "Browse all 48 national teams at the FIFA World Cup 2026 by group, with full squads, club stats and head coaches.",
+  path: "/teams",
+});
 export const revalidate = 3600;
 
 export default async function TeamsPage() {

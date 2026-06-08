@@ -1,10 +1,14 @@
-import type { Metadata } from "next";
 import { StandingsTable } from "@/components/groups/StandingsTable";
 import { SetupNotice } from "@/components/EmptyState";
 import { getStandings, getTeamsByGroup } from "@/lib/queries";
 import type { StandingWithTeam } from "@/types/match";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Groups" };
+export const metadata = pageMetadata({
+  title: "Groups",
+  description: "All 12 group standings for the FIFA World Cup 2026, updated after each match.",
+  path: "/groups",
+});
 export const revalidate = 1800;
 
 export default async function GroupsPage() {

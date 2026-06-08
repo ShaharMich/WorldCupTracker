@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/seo";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -13,14 +14,37 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "FIFA World Cup 2026 Tracker",
+    default: SITE_NAME,
     template: "%s · World Cup 2026",
   },
-  description:
-    "Track all 48 teams, 104 matches, squads, live scores and group standings for the FIFA World Cup 2026.",
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: [
+    "World Cup 2026",
+    "FIFA World Cup",
+    "USA Canada Mexico",
+    "fixtures",
+    "standings",
+    "live scores",
+    "bracket",
+  ],
   // Stop mobile browsers auto-linking times/dates (the "highlighted" date bug).
   formatDetection: { telephone: false, date: false, email: false, address: false },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    url: "/",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({
