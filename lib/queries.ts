@@ -105,6 +105,17 @@ export async function getMatchesForVenue(venueName: string): Promise<MatchWithTe
   return attachTeams((data as Match[]) ?? [], await teamMap());
 }
 
+export async function getKnockoutMatches(): Promise<MatchWithTeams[]> {
+  if (!isServerSupabaseConfigured()) return [];
+  const db = getServerSupabase();
+  const { data } = await db
+    .from("matches")
+    .select("*")
+    .neq("stage", "Group Stage")
+    .order("kickoff_utc");
+  return attachTeams((data as Match[]) ?? [], await teamMap());
+}
+
 export async function getUpcomingMatches(limit = 5): Promise<MatchWithTeams[]> {
   if (!isServerSupabaseConfigured()) return [];
   const db = getServerSupabase();

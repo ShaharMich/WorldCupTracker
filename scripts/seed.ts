@@ -9,13 +9,14 @@ import { runSeed, type SeedOptions } from "@/lib/seed";
 const args = process.argv.slice(2);
 const opts: SeedOptions =
   args.length === 0
-    ? { teams: true, players: true, fixtures: true, coaches: true, standings: true }
+    ? { teams: true, players: true, fixtures: true, coaches: true, standings: true, wcstats: true }
     : {
         teams: args.includes("teams"),
         players: args.includes("players"),
         fixtures: args.includes("fixtures"),
         coaches: args.includes("coaches"),
         standings: args.includes("standings"),
+        wcstats: args.includes("wcstats"),
       };
 
 const log = (msg: string) => console.log(`[seed] ${msg}`);

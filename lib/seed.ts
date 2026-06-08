@@ -6,6 +6,8 @@ import {
   fetchTransfers,
   fetchCoaches,
   fetchStandings,
+  fetchFixtures,
+  fetchFixturePlayers,
   CLUB_SEASON,
 } from "@/lib/api/api-football";
 import {
@@ -147,7 +149,7 @@ function isClubStat(leagueName: string | null | undefined): boolean {
 
 // Picks the player's primary club (most minutes across club competitions) and
 // sums their 2025/26 totals across all club competitions for the stat cards.
-function aggregateClubSeason(p: AFPlayerResponse) {
+export function aggregateClubSeason(p: AFPlayerResponse) {
   const club = (p.statistics ?? []).filter((s) => isClubStat(s.league?.name));
   if (club.length === 0) return { primary: null, totals: null };
 
@@ -186,23 +188,84 @@ function aggregateClubSeason(p: AFPlayerResponse) {
   };
 }
 
+// Normalized club name for de-duping (case/accents/punctuation insensitive), so
+// "Fenerbahce" and "Fenerbahçe" collapse to one entry.
+function clubKey(name: string): string {
+  return name.toLowerCase().normalize("NFD").replace(/[^a-z0-9]/g, "");
+}
+
 // Builds a career timeline (newest first) from transfer history. Per-club
 // appearance/goal totals aren't available from /transfers, so they stay null;
-// the UI renders the club + year and omits the counts when null.
+// the UI renders the club + year and omits the counts when null. Consecutive
+// entries for the same club (e.g. a loan that became permanent, or duplicate
+// feed rows) are collapsed to a single entry keeping the most recent year.
 function buildCareer(transfers: AFTransferResponse[]) {
   const moves = transfers[0]?.transfers ?? [];
   if (moves.length === 0) return null;
-  const career = moves
+  const sorted = moves
     .slice()
     .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))
     .map((m) => ({
       club: m.teams.in?.name ?? "Unknown",
       season: m.date ? m.date.slice(0, 4) : "",
-      appearances: null,
-      goals: null,
+      appearances: null as number | null,
+      goals: null as number | null,
     }))
     .filter((c) => c.club !== "Unknown");
+
+  const career: typeof sorted = [];
+  for (const c of sorted) {
+    const prev = career[career.length - 1];
+    if (prev && clubKey(prev.club) === clubKey(c.club)) continue; // keep newest
+    career.push(c);
+  }
   return career.length > 0 ? career : null;
+}
+
+// The player's most recent transfer destination (with team id + logo), used to
+// correct the current club when the stats-derived club lags behind a recent move.
+function latestMove(transfers: AFTransferResponse[]): AFTransferResponse["transfers"][number] | null {
+  const moves = (transfers[0]?.transfers ?? []).filter((m) => m.teams.in?.name);
+  if (moves.length === 0) return null;
+  return moves.slice().sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))[0];
+}
+
+export interface CurrentClub {
+  club_id: number | null;
+  club_name: string | null;
+  club_logo_url: string | null;
+  club_country: string | null;
+}
+
+// Resolves a player's current club (id, name, logo, country) from their stats
+// primary club, overridden by a more recent transfer. Shared by mapPlayer (seed)
+// and the logo-repair script so both stay in lockstep.
+export function currentClubFrom(
+  primary: ReturnType<typeof aggregateClubSeason>["primary"],
+  transfers: AFTransferResponse[],
+): CurrentClub {
+  let club_id = primary?.team?.id ?? null;
+  let club_name = primary?.team?.name ?? null;
+  let club_logo_url = primary?.team?.logo ?? null;
+  let club_country = primary?.league?.country ?? null;
+
+  // If the most recent transfer is to a different club and is at least as recent
+  // as the stats season we pulled (CLUB_SEASON), trust the transfer — this catches
+  // mid-season moves whose minutes haven't yet overtaken the former club. Require
+  // the transfer destination to carry a logo: the feed sometimes lists a name
+  // variant of the same club (e.g. "Internazionale" vs the senior "Inter") with a
+  // null logo, and overriding with that would blank out the correct primary logo.
+  const latest = latestMove(transfers);
+  if (latest && latest.teams.in?.name && latest.teams.in.logo) {
+    const year = latest.date ? Number(latest.date.slice(0, 4)) : null;
+    if (latest.teams.in.id !== club_id && year != null && year >= CLUB_SEASON) {
+      club_id = latest.teams.in.id;
+      club_name = latest.teams.in.name;
+      club_logo_url = latest.teams.in.logo;
+      club_country = null; // /transfers carries no country
+    }
+  }
+  return { club_id, club_name, club_logo_url, club_country };
 }
 
 // Maps an API-Football player (detail + transfers + squad slot) to a DB row.
@@ -215,6 +278,8 @@ function mapPlayer(
   squad: AFSquadPlayer,
 ) {
   const { primary, totals } = aggregateClubSeason(p);
+  const club = currentClubFrom(primary, transfers);
+
   return {
     id: p.player.id,
     name: p.player.name,
@@ -229,10 +294,10 @@ function mapPlayer(
     weight: p.player.weight,
     jersey_number: squad.number,
     photo_url: p.player.photo ?? squad.photo,
-    club_id: primary?.team?.id ?? null,
-    club_name: primary?.team?.name ?? null,
-    club_logo_url: primary?.team?.logo ?? null,
-    club_country: primary?.league?.country ?? null,
+    club_id: club.club_id,
+    club_name: club.club_name,
+    club_logo_url: club.club_logo_url,
+    club_country: club.club_country,
     stats_club_season: totals,
     career_clubs: buildCareer(transfers),
     updated_at: new Date().toISOString(),
@@ -590,12 +655,106 @@ export async function seedStandings(log: Logger = noop): Promise<void> {
   log(`Upserted ${rows.length} standings rows.`);
 }
 
+// Aggregates each player's World Cup 2026 tournament stats from finished WC
+// fixtures and writes them to players.stats_wc. Iterates API-Football fixtures
+// directly (league=1, season=2026) so fixture + player ids stay in API-Football
+// space — our players table is keyed by API-Football player id, so per-fixture
+// stats map straight onto our rows (no crosswalk needed here). Idempotent:
+// re-running after each match recomputes totals across all completed fixtures.
+export async function seedWCPlayerStats(log: Logger = noop): Promise<void> {
+  const db = getServerSupabase();
+  log("Fetching WC 2026 fixtures (API-Football) for player stats...");
+  const fixtures = await fetchFixtures();
+  const finished = fixtures.filter((f) =>
+    ["FT", "AET", "PEN"].includes(f.fixture.status.short),
+  );
+  log(`${finished.length}/${fixtures.length} fixtures finished.`);
+  if (finished.length === 0) {
+    log("No completed matches yet — nothing to aggregate.");
+    return;
+  }
+
+  type Agg = {
+    appearances: number;
+    lineups: number;
+    minutes: number;
+    goals: number;
+    assists: number;
+    yellow: number;
+    red: number;
+    ratingSum: number;
+    ratingMin: number;
+  };
+  const agg = new Map<number, Agg>();
+  const get = (id: number): Agg => {
+    let a = agg.get(id);
+    if (!a) {
+      a = { appearances: 0, lineups: 0, minutes: 0, goals: 0, assists: 0, yellow: 0, red: 0, ratingSum: 0, ratingMin: 0 };
+      agg.set(id, a);
+    }
+    return a;
+  };
+
+  for (const f of finished) {
+    await sleep(RATE_LIMIT_MS);
+    try {
+      const entries = await fetchFixturePlayers(f.fixture.id);
+      for (const entry of entries) {
+        for (const p of entry.players) {
+          const st = p.statistics?.[0];
+          if (!st) continue;
+          const mins = st.games?.minutes ?? 0;
+          if (mins <= 0) continue; // unused subs have null/0 minutes — didn't play
+          const a = get(p.player.id);
+          a.appearances += 1;
+          if (st.games?.substitute === false) a.lineups += 1;
+          a.minutes += mins;
+          a.goals += st.goals?.total ?? 0;
+          a.assists += st.goals?.assists ?? 0;
+          a.yellow += st.cards?.yellow ?? 0;
+          a.red += st.cards?.red ?? 0;
+          const r = st.games?.rating ? Number(st.games.rating) : NaN;
+          if (Number.isFinite(r)) {
+            a.ratingSum += r * mins;
+            a.ratingMin += mins;
+          }
+        }
+      }
+    } catch (e) {
+      log(`  fixture ${f.fixture.id} player stats failed: ${(e as Error).message}`);
+    }
+  }
+
+  log(`Aggregated WC stats for ${agg.size} players. Writing to Supabase...`);
+  let updated = 0;
+  for (const [id, a] of agg) {
+    const stats_wc = {
+      appearances: a.appearances,
+      lineups: a.lineups,
+      minutes: a.minutes,
+      goals: a.goals,
+      assists: a.assists,
+      yellow_cards: a.yellow,
+      red_cards: a.red,
+      rating: a.ratingMin > 0 ? (a.ratingSum / a.ratingMin).toFixed(2) : null,
+    };
+    const { error } = await db
+      .from("players")
+      .update({ stats_wc, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) log(`  player ${id} stats_wc update failed: ${error.message}`);
+    else updated++;
+  }
+  log(`Updated stats_wc for ${updated} players.`);
+}
+
 export interface SeedOptions {
   teams?: boolean;
   players?: boolean;
   fixtures?: boolean;
   coaches?: boolean;
   standings?: boolean;
+  wcstats?: boolean;
 }
 
 export async function runSeed(
@@ -605,6 +764,7 @@ export async function runSeed(
     fixtures: true,
     coaches: true,
     standings: true,
+    wcstats: true,
   },
   log: Logger = noop,
 ): Promise<void> {
@@ -613,5 +773,6 @@ export async function runSeed(
   if (opts.players) await seedPlayersFromApiFootball(log);
   if (opts.coaches) await seedCoaches(log);
   if (opts.standings) await seedStandings(log);
+  if (opts.wcstats) await seedWCPlayerStats(log);
   log("Seed complete.");
 }

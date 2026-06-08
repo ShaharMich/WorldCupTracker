@@ -46,41 +46,51 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --color-gold: var(--gold);
+  --color-gold-bright: var(--gold-bright);
+  --color-navy: var(--navy);
+  --color-navy-deep: var(--navy-deep);
 }
 
+/* World Cup 2026 — deep navy/blue pitch with gold trophy accents. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --gold: oklch(0.82 0.16 85);
+  --gold-bright: oklch(0.9 0.13 92);
+  --navy-deep: oklch(0.13 0.035 260);
+  --navy: oklch(0.2 0.045 258);
+
+  --background: oklch(0.17 0.035 257);
+  --foreground: oklch(0.96 0.012 250);
+  --card: oklch(0.225 0.04 257);
+  --card-foreground: oklch(0.96 0.012 250);
+  --popover: oklch(0.225 0.04 257);
+  --popover-foreground: oklch(0.96 0.012 250);
+  --primary: oklch(0.82 0.16 85);
+  --primary-foreground: oklch(0.21 0.05 262);
+  --secondary: oklch(0.3 0.05 258);
+  --secondary-foreground: oklch(0.96 0.012 250);
+  --muted: oklch(0.27 0.035 258);
+  --muted-foreground: oklch(0.74 0.03 255);
+  --accent: oklch(0.58 0.16 255);
+  --accent-foreground: oklch(0.98 0.01 250);
+  --destructive: oklch(0.62 0.22 22);
+  --border: oklch(0.5 0.04 258 / 28%);
+  --input: oklch(0.5 0.04 258 / 40%);
+  --ring: oklch(0.82 0.16 85);
+  --chart-1: oklch(0.82 0.16 85);
+  --chart-2: oklch(0.58 0.16 255);
+  --chart-3: oklch(0.7 0.13 200);
+  --chart-4: oklch(0.65 0.18 25);
+  --chart-5: oklch(0.75 0.15 145);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.2 0.045 258);
+  --sidebar-foreground: oklch(0.96 0.012 250);
+  --sidebar-primary: oklch(0.82 0.16 85);
+  --sidebar-primary-foreground: oklch(0.21 0.05 262);
+  --sidebar-accent: oklch(0.3 0.05 258);
+  --sidebar-accent-foreground: oklch(0.96 0.012 250);
+  --sidebar-border: oklch(0.5 0.04 258 / 28%);
+  --sidebar-ring: oklch(0.82 0.16 85);
 }
 
 .dark {
@@ -127,4 +137,30 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Energetic World Cup hero: blue stadium glow + gold trophy light over navy. */
+.wc-hero {
+  background:
+    radial-gradient(circle at 18% 18%, oklch(0.5 0.16 255 / 0.55), transparent 55%),
+    radial-gradient(circle at 85% 12%, oklch(0.72 0.15 88 / 0.32), transparent 52%),
+    linear-gradient(160deg, var(--navy-deep) 0%, oklch(0.23 0.06 262) 60%, oklch(0.27 0.07 250) 100%);
+}
+
+/* Thin pitch-stripe sheen used behind section headers / bracket. */
+.wc-pitch {
+  background-image: repeating-linear-gradient(
+    90deg,
+    oklch(0.5 0.16 255 / 0.05) 0,
+    oklch(0.5 0.16 255 / 0.05) 2px,
+    transparent 2px,
+    transparent 48px
+  );
+}
+
+.text-gradient-gold {
+  background: linear-gradient(90deg, var(--gold-bright), var(--gold) 55%, oklch(0.7 0.13 60));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }

@@ -24,5 +24,16 @@ export const NAV_LINKS = [
   { href: "/teams", label: "Teams" },
   { href: "/groups", label: "Groups" },
   { href: "/matches", label: "Schedule" },
+  { href: "/bracket", label: "Bracket" },
   { href: "/stadiums", label: "Stadiums" },
+] as const;
+
+// Knockout rounds in bracket order, mapped to the stage labels stored on matches
+// (see fdStage in lib/seed.ts).
+export const KNOCKOUT_STAGES = [
+  "Round of 32",
+  "Round of 16",
+  "Quarter-final",
+  "Semi-final",
+  "Final",
 ] as const;

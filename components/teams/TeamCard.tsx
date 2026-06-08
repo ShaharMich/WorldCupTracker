@@ -1,18 +1,42 @@
 import Link from "next/link";
+import Image from "next/image";
 import { TeamBadge } from "@/components/TeamBadge";
 import type { Team } from "@/types/team";
 
 export function TeamCard({ team }: { team: Team }) {
+  const crest = team.logo_url || team.flag_url;
   return (
     <Link
       href={`/teams/${team.id}`}
-      className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted/50"
+      className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-xl border border-border bg-card p-5 text-center shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/10"
     >
-      <TeamBadge team={team} size={32} />
-      <div className="min-w-0">
-        <p className="truncate font-medium">{team.name}</p>
+      {/* Faint crest watermark for depth + energy. */}
+      {crest ? (
+        <Image
+          src={crest}
+          alt=""
+          aria-hidden
+          width={160}
+          height={160}
+          unoptimized
+          className="pointer-events-none absolute -right-6 -top-6 size-32 rotate-12 object-contain opacity-[0.06] transition-opacity duration-200 group-hover:opacity-[0.12]"
+        />
+      ) : null}
+
+      {team.group_code ? (
+        <span className="absolute left-3 top-3 rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+          {team.group_code}
+        </span>
+      ) : null}
+
+      <div className="relative grid size-16 place-items-center rounded-full bg-secondary/50 ring-1 ring-border transition-transform duration-200 group-hover:scale-110">
+        <TeamBadge team={team} size={44} />
+      </div>
+
+      <div className="relative min-w-0">
+        <p className="truncate font-bold leading-tight group-hover:text-primary">{team.name}</p>
         {team.confederation ? (
-          <p className="text-xs text-muted-foreground">{team.confederation}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{team.confederation}</p>
         ) : null}
       </div>
     </Link>

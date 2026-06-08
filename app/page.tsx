@@ -22,25 +22,28 @@ export default async function Home() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <section className="flex flex-col items-center gap-6 rounded-2xl border border-border bg-gradient-to-b from-primary/5 to-card px-6 py-12 text-center">
-        <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">
-          USA · Canada · Mexico
-        </p>
-        <h1 className="text-4xl font-bold sm:text-5xl">FIFA World Cup 2026</h1>
-        <p className="max-w-xl text-muted-foreground">
-          {WC.teams} teams · {WC.matches} matches · {WC.groups} groups. Kicks off
-          June 11, 2026.
+      <section className="wc-hero relative flex flex-col items-center gap-6 overflow-hidden rounded-3xl border border-primary/20 px-6 py-14 text-center shadow-xl shadow-navy-deep/40 sm:py-16">
+        <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-primary">
+          🇺🇸 USA · 🇨🇦 Canada · 🇲🇽 Mexico
+        </span>
+        <h1 className="text-5xl font-extrabold tracking-tight sm:text-7xl">
+          <span className="text-gradient-gold">FIFA World Cup</span>
+          <span className="block text-foreground">2026</span>
+        </h1>
+        <p className="max-w-xl text-base text-white/80">
+          {WC.teams} teams · {WC.matches} matches · {WC.groups} groups across three
+          nations. The tournament kicks off June 11, 2026.
         </p>
         <CountdownTimer targetUtc={WC.openingMatchUtc} />
-        <div className="flex flex-wrap justify-center gap-2">
-          <Link href="/teams" className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80">
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link href="/teams" className="rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-transform hover:scale-105">
             Browse Teams
           </Link>
-          <Link href="/matches" className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
-            Full Schedule
+          <Link href="/bracket" className="rounded-full border border-primary/40 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/10">
+            View Bracket
           </Link>
-          <Link href="/groups" className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
-            Group Standings
+          <Link href="/matches" className="rounded-full border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/10">
+            Full Schedule
           </Link>
         </div>
       </section>

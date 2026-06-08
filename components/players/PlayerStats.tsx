@@ -36,17 +36,3 @@ export function PlayerStats({
     </div>
   );
 }
-
-export function NationalSummary({ player }: { player: import("@/types/player").Player }) {
-  return (
-    <div>
-      <h2 className="mb-2 text-lg font-semibold">National Team</h2>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Caps" value={player.national_team_caps ?? 0} />
-        <StatCard label="Goals" value={player.national_team_goals ?? 0} />
-        <StatCard label="WC Apps" value={player.wc_appearances ?? 0} />
-        <StatCard label="WC Goals" value={player.wc_goals ?? 0} />
-      </div>
-    </div>
-  );
-}

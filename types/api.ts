@@ -174,6 +174,28 @@ export interface AFFixtureEvent {
   detail: string;
 }
 
+// Per-player stats for a single fixture (GET /fixtures/players?fixture=).
+export interface AFFixturePlayerStats {
+  player: { id: number; name: string; photo: string | null };
+  statistics: {
+    games: {
+      minutes: number | null;
+      number: number | null;
+      position: string | null;
+      rating: string | null;
+      captain: boolean | null;
+      substitute: boolean | null;
+    };
+    goals: { total: number | null; conceded: number | null; assists: number | null; saves: number | null };
+    cards: { yellow: number | null; red: number | null };
+  }[];
+}
+
+export interface AFFixturePlayersEntry {
+  team: { id: number; name: string; logo: string | null };
+  players: AFFixturePlayerStats[];
+}
+
 export interface AFLineupEntry {
   team: { id: number; name: string; logo: string | null };
   coach: { id: number | null; name: string | null };

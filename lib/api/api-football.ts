@@ -8,6 +8,7 @@ import type {
   AFFixtureStatistics,
   AFFixtureEvent,
   AFLineupEntry,
+  AFFixturePlayersEntry,
   AFTransferResponse,
   AFCoach,
 } from "@/types/api";
@@ -105,4 +106,9 @@ export function fetchFixtureEvents(fixtureId: number): Promise<AFFixtureEvent[]>
 
 export function fetchFixtureLineups(fixtureId: number): Promise<AFLineupEntry[]> {
   return afFetch<AFLineupEntry>("/fixtures/lineups", { fixture: fixtureId });
+}
+
+// Per-player stats for one fixture (minutes, goals, assists, cards, rating).
+export function fetchFixturePlayers(fixtureId: number): Promise<AFFixturePlayersEntry[]> {
+  return afFetch<AFFixturePlayersEntry>("/fixtures/players", { fixture: fixtureId });
 }

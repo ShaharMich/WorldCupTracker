@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PlayerHero } from "@/components/players/PlayerHero";
-import { PlayerStats, NationalSummary } from "@/components/players/PlayerStats";
+import { PlayerStats } from "@/components/players/PlayerStats";
+import { PlayerWCStats } from "@/components/players/PlayerWCStats";
 import { PlayerCareer } from "@/components/players/PlayerCareer";
 import { getPlayer, getTeam } from "@/lib/queries";
 
@@ -34,12 +35,9 @@ export default async function PlayerPage({
   return (
     <div className="mx-auto max-w-4xl space-y-8 px-4 py-8">
       <PlayerHero player={player} team={team} />
+      <PlayerWCStats stats={player.stats_wc} />
       <PlayerStats stats={player.stats_club_season} title="Club Season (2025/26)" />
-      {player.stats_wc ? (
-        <PlayerStats stats={player.stats_wc} title="World Cup 2026" />
-      ) : null}
-      <NationalSummary player={player} />
-      <PlayerCareer career={player.career_clubs} />
+      <PlayerCareer career={player.career_clubs} currentClub={player.club_name} />
     </div>
   );
 }

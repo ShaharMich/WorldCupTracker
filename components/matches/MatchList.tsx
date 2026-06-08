@@ -66,7 +66,8 @@ export function MatchList({ matches }: { matches: MatchWithTeams[] }) {
         <div className="space-y-8">
           {grouped.map(([day, dayMatches]) => (
             <section key={day}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                <span className="h-4 w-1 rounded-full bg-primary" />
                 {formatMatchDay(dayMatches[0].kickoff_utc)}
               </h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

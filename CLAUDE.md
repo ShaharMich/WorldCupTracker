@@ -13,7 +13,7 @@ The app is built to be **public-facing** (not just personal), production-grade, 
 
 ## Tech Stack
 - **Framework**: Next.js 16 (App Router, Turbopack) + React 19 + TypeScript
-- **Styling**: Tailwind CSS v4 (CSS-based config, no `tailwind.config`) + shadcn/ui
+- **Styling**: Tailwind CSS v4 (CSS-based config, no `tailwind.config`) + shadcn/ui. **Theme is a dark navy/blue pitch with gold trophy accents** — all tokens live in `app/globals.css` `:root` (oklch). Extra tokens: `--color-gold`/`gold-bright`, `--color-navy`/`navy-deep`; helper classes `.wc-hero` (gradient hero bg), `.wc-pitch` (stripe sheen, used on the bracket), `.text-gradient-gold` (gold text). Cards use `bg-card`, hover lift + `border-primary` glow. **Favicon** is a ⚽ emoji SVG at `app/icon.svg` (the old `favicon.ico` was removed; Next.js App Router auto-serves `icon.svg`).
 - **Database**: Supabase (PostgreSQL) — caching, data persistence, seeding
 - **Deployment**: Vercel
 - **Mobile (Phase 2)**: Capacitor wrapping the Next.js export
@@ -360,9 +360,9 @@ export async function getCached<T>(
 - Large photo, name, nationality flag, jersey number
 - Club badge + club name + country
 - Stat cards: goals, assists, appearances, avg rating (current club season)
-- National team summary: caps, goals, WC appearances, WC goals
-- WC 2026 tournament stats (once tournament starts)
-- Career timeline: list of clubs with years, matches, goals
+- **WC 2026 tournament stats** (`PlayerWCStats`, shown only when `stats_wc` is populated, after the player's matches): appearances, goals, assists, yellow cards, red cards, minutes played — sourced from the `wcstats` seed step.
+- Career timeline: list of clubs with years, matches, goals. Falls back to the current club as a single entry when there's no transfer history (academy products like Yamal), instead of "Career history not available."
+- **No National Team stats section** — caps/goals/WC apps/WC goals were removed (the data isn't populated, so it only showed zeros). The `NationalSummary` component is gone.
 - Trophy cabinet: club + national team titles
 
 ### `/matches` — All Fixtures & Results
@@ -378,6 +378,11 @@ export async function getCached<T>(
 - Stats comparison: possession bars, shots, shots on target, passes, fouls, corners
 - Lineups: starting XI (formation view or list) + bench for both teams
 - Player ratings if available
+
+### `/bracket` — Knockout Bracket
+- Full knockout tree in stage columns: Round of 32 → Round of 16 → Quarter-finals → Semi-finals → Final, with the Third-place Play-off shown separately below.
+- Pre-tournament every slot renders **TBD** (the 32 knockout fixtures exist in `matches` with null `home_team_id`/`away_team_id`); each card still shows kickoff time + city/venue and links to the match detail page. Winners + scores fill in automatically once results are seeded.
+- Data via `getKnockoutMatches()` (all matches where `stage != 'Group Stage'`); stage order comes from `KNOCKOUT_STAGES` in `lib/constants.ts`. Components: `components/bracket/BracketMatch.tsx`, page `app/bracket/page.tsx`. Horizontally scrollable on small screens.
 
 ### `/groups` — Group Standings
 - All 12 groups in a responsive grid
@@ -425,9 +430,10 @@ Prereq: create `.env.local` (see `.env.local.example`) and run `supabase/schema.
 What each step currently does (see `lib/seed.ts`):
 1. **teams** — `football-data.org /competitions/WC/teams` → upsert 48 teams; group_code is derived from the group-stage fixtures (the teams endpoint has no group info).
 2. **fixtures** — `football-data.org /competitions/WC/matches` → upsert all 104 fixtures (stage/group/status mapped to our schema); **venue/city/country are filled from the hardcoded `lib/venues.ts` catalog** since the feed has no venue field.
-3. **players** — `seedPlayersFromApiFootball`: crosswalk teams → pull all 48 squads → drop stale rows → upsert base rows → enrich each player with API-Football detail (bio + 2025/26 club stats) and transfers (career). **Resumable** — re-runs skip players that already have `career_clubs`.
+3. **players** — `seedPlayersFromApiFootball`: crosswalk teams → pull all 48 squads → drop stale rows → upsert base rows → enrich each player with API-Football detail (bio + 2025/26 club stats) and transfers (career). **Resumable** — re-runs skip players that already have `career_clubs`. `buildCareer` collapses consecutive duplicate clubs; `mapPlayer` corrects `club_name` to the **most recent transfer** when that move is newer than (and differs from) the stats-derived primary club (year ≥ `CLUB_SEASON`) — fixing players whose mid-season move hasn't yet overtaken their old club in minutes. The same corrections are applied to already-seeded rows by `scripts/fix-player-clubs.ts` (no API calls), which also hardcodes curated careers for Messi/Ronaldo/Yamal.
 4. **coaches** — `seedCoaches`: per team (via the crosswalk) fetch API-Football `/coachs`, pick the current coach (career entry with `end=null`), and write `coach_name`/`coach_photo_url`/`coach_nationality`/`coach_id` onto the teams row. 48/48 coverage at last run.
 5. **standings** — API-Football `/standings`, with team IDs crosswalked to our football-data team IDs (unmatched entries skipped). Pre-tournament rows are mostly zeros; the `/groups` page still falls back to placeholder rows from the team list when empty.
+6. **wcstats** — `seedWCPlayerStats`: iterates **API-Football** WC fixtures directly (league=1, season=2026), takes the finished ones (`FT`/`AET`/`PEN`), pulls `/fixtures/players` per fixture, and aggregates each player's tournament totals (appearances, lineups, minutes, goals, assists, yellow/red cards, minutes-weighted rating) into `players.stats_wc`. **Player ids are API-Football ids = our `players.id`, so no crosswalk is needed** (and it sidesteps the fd↔af fixture-id mismatch by never using our match ids). **Idempotent** — re-run after each match to recompute from all completed fixtures. No-op pre-tournament (zero finished fixtures). Surfaced on the player profile via `PlayerWCStats`.
 
 The seed upserts (`ON CONFLICT DO UPDATE`) so re-runs are safe. Player enrichment spaces TheSportsDB calls (~500ms) for rate limits.
 
@@ -515,10 +521,22 @@ npm run seed
 npm run seed -- teams fixtures
 npm run seed -- players            # resumable: skips already-enriched players
 npm run seed -- coaches            # current head coach (name, photo, nationality) per team
+npm run seed -- wcstats            # aggregate WC 2026 player stats from finished fixtures (run after each match)
 
 # Repair/clean player enrichment against the soccer filter (see Seeding Strategy)
 npx tsx scripts/revalidate-enrichment.ts            # all players
 npx tsx scripts/revalidate-enrichment.ts enriched   # only already-enriched rows
+
+# Repair player current-club + career data already in Supabase (no API calls):
+#   - collapse consecutive duplicate clubs in career_clubs
+#   - correct club_name when the latest career entry is newer than it
+#   - hardcode curated careers for Messi / Ronaldo / Yamal
+npx tsx scripts/fix-player-clubs.ts
+
+# Backfill missing club logos (players with a club_name but null club_logo_url) by
+# recomputing each player's club from API-Football detail + transfers (shared
+# currentClubFrom resolver). Lookup-by-name is unreliable, so we re-derive the id.
+npx tsx scripts/fix-club-logos.ts
 
 # Type checking
 npm run typecheck   # alias for: tsc --noEmit
