@@ -1,6 +1,6 @@
 export const WC = {
   name: "FIFA World Cup 2026",
-  openingMatchUtc: "2026-06-11T20:00:00Z", // Opening match: Mexico vs South Africa, Estadio Azteca
+  openingMatchUtc: "2026-06-11T19:00:00Z", // Opening match: Mexico vs South Africa, Estadio Azteca
   finalUtc: "2026-07-19T19:00:00Z", // MetLife Stadium, New Jersey
   teams: 48,
   matches: 104,
