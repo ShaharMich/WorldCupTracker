@@ -31,15 +31,16 @@ export function MatchCard({ match }: { match: MatchWithTeams }) {
         ) : null}
       </div>
 
-      {/* Flags are the main visual: large and clear on each side, names centred. */}
+      {/* Clear 32px flags on each side; names centred and always shown in full
+          (wrapping to a second line rather than truncating). */}
       <div className="flex items-center gap-2">
         <TeamBadge
           team={match.home_team}
-          size={48}
+          size={32}
           fallbackName="Home TBD"
-          className="size-12 shrink-0"
+          className="size-8 shrink-0"
         />
-        <span className="flex-1 truncate text-right text-sm font-semibold">
+        <span className="flex-1 text-balance break-words text-right text-sm font-semibold leading-tight">
           {match.home_team?.name ?? "TBD"}
         </span>
 
@@ -47,14 +48,14 @@ export function MatchCard({ match }: { match: MatchWithTeams }) {
           {center}
         </span>
 
-        <span className="flex-1 truncate text-left text-sm font-semibold">
+        <span className="flex-1 text-balance break-words text-left text-sm font-semibold leading-tight">
           {match.away_team?.name ?? "TBD"}
         </span>
         <TeamBadge
           team={match.away_team}
-          size={48}
+          size={32}
           fallbackName="Away TBD"
-          className="size-12 shrink-0"
+          className="size-8 shrink-0"
         />
       </div>
 
