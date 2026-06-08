@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { BackButton } from "@/components/BackButton";
 import { PlayerHero } from "@/components/players/PlayerHero";
 import { PlayerStats } from "@/components/players/PlayerStats";
 import { PlayerWCStats } from "@/components/players/PlayerWCStats";
@@ -33,11 +34,14 @@ export default async function PlayerPage({
   const team = player.team_id ? await getTeam(player.team_id) : null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 px-4 py-8">
-      <PlayerHero player={player} team={team} />
-      <PlayerWCStats stats={player.stats_wc} />
-      <PlayerStats stats={player.stats_club_season} title="Club Season (2025/26)" />
-      <PlayerCareer career={player.career_clubs} currentClub={player.club_name} />
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      <BackButton />
+      <div className="space-y-8">
+        <PlayerHero player={player} team={team} />
+        <PlayerWCStats stats={player.stats_wc} />
+        <PlayerStats stats={player.stats_club_season} title="Club Season (2025/26)" />
+        <PlayerCareer career={player.career_clubs} currentClub={player.club_name} />
+      </div>
     </div>
   );
 }

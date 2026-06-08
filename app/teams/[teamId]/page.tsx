@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { BackButton } from "@/components/BackButton";
 import { TeamBadge } from "@/components/TeamBadge";
 import { PlayerPhoto } from "@/components/PlayerPhoto";
 import { SquadTable } from "@/components/teams/SquadTable";
@@ -44,6 +45,7 @@ export default async function TeamDetailPage({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
+      <BackButton />
       <div className="mb-8 flex flex-wrap items-center gap-4">
         <TeamBadge team={team} size={56} />
         <div>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { BackButton } from "@/components/BackButton";
 import { MatchDetail } from "@/components/matches/MatchDetail";
 import { getMatch } from "@/lib/queries";
 
@@ -32,6 +33,7 @@ export default async function MatchPage({
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
+      <BackButton />
       <MatchDetail initial={match} />
     </div>
   );

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { MapPin, Users } from "lucide-react";
+import { BackButton } from "@/components/BackButton";
 import { MatchCard } from "@/components/matches/MatchCard";
 import { StadiumImage } from "@/components/StadiumImage";
 import { VENUES, getVenue, type VenueId, type HostCountry } from "@/lib/venues";
@@ -38,6 +39,7 @@ export default async function StadiumPage({
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
+      <BackButton />
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <StadiumImage
           src={stadium.imageUrl}
