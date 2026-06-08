@@ -215,27 +215,41 @@ export function withSeasonRanges<T extends { season: string }>(career: T[]): T[]
 // the UI renders the club + year and omits the counts when null. Consecutive
 // entries for the same club (e.g. a loan that became permanent, or duplicate
 // feed rows) are collapsed to a single entry keeping the most recent year.
-function buildCareer(transfers: AFTransferResponse[]) {
-  const moves = transfers[0]?.transfers ?? [];
+export function buildCareer(transfers: AFTransferResponse[]) {
+  const moves = (transfers[0]?.transfers ?? []).filter((m) => m.teams.in?.name);
   if (moves.length === 0) return null;
-  const sorted = moves
+  const sortedMoves = moves
     .slice()
-    .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))
-    .map((m) => ({
-      club: m.teams.in?.name ?? "Unknown",
-      season: m.date ? m.date.slice(0, 4) : "",
-      appearances: null as number | null,
-      goals: null as number | null,
-    }))
-    .filter((c) => c.club !== "Unknown");
+    .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "")); // newest first
 
-  const career: typeof sorted = [];
-  for (const c of sorted) {
-    const prev = career[career.length - 1];
+  const inClubs = sortedMoves.map((m) => ({
+    club: m.teams.in!.name as string,
+    season: m.date ? m.date.slice(0, 4) : "",
+    appearances: null as number | null,
+    goals: null as number | null,
+  }));
+
+  // Collapse consecutive duplicate clubs (loan→permanent, duplicate feed rows).
+  const deduped: typeof inClubs = [];
+  for (const c of inClubs) {
+    const prev = deduped[deduped.length - 1];
     if (prev && clubKey(prev.club) === clubKey(c.club)) continue; // keep newest
-    career.push(c);
+    deduped.push(c);
   }
-  return career.length > 0 ? withSeasonRanges(career) : null;
+  const career = withSeasonRanges(deduped);
+
+  // Transfers only record the clubs a player moved INTO, so the club they came up
+  // through (the `out` side of their earliest move) is otherwise missing — this is
+  // why single-transfer players lose their origin club. Append it: the end year is
+  // known (when they left), the start year isn't, so it renders open ("–2026").
+  const oldest = sortedMoves[sortedMoves.length - 1];
+  const origin = oldest.teams.out?.name;
+  const last = career[career.length - 1];
+  if (origin && (!last || clubKey(last.club) !== clubKey(origin))) {
+    const endYear = oldest.date ? oldest.date.slice(0, 4) : "";
+    career.push({ club: origin, season: endYear ? `–${endYear}` : "", appearances: null, goals: null });
+  }
+  return career.length > 0 ? career : null;
 }
 
 // The player's most recent transfer destination (with team id + logo), used to

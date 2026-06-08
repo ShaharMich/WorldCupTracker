@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
 import { LiveBadge } from "@/components/matches/LiveBadge";
-import { formatKickoff, formatKickoffTime } from "@/lib/utils";
+import { formatKickoffTime } from "@/lib/utils";
 import { isLiveStatus, isFinishedStatus, type MatchWithTeams } from "@/types/match";
 
 export function MatchCard({ match }: { match: MatchWithTeams }) {
@@ -59,12 +59,11 @@ export function MatchCard({ match }: { match: MatchWithTeams }) {
         />
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-xs text-muted-foreground">
-        <span className="truncate">
+      <div className="mt-3 border-t border-border pt-2 text-xs text-muted-foreground">
+        <span className="block truncate">
           {match.venue ?? "Stadium TBD"}
           {match.city ? ` · ${match.city}` : ""}
         </span>
-        {!live ? <span className="shrink-0">{formatKickoff(match.kickoff_utc)}</span> : null}
       </div>
     </Link>
   );

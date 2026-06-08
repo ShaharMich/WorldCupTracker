@@ -24,7 +24,7 @@ export default async function Home() {
     <div className="mx-auto max-w-6xl px-4 py-8">
       <section className="wc-hero relative flex flex-col items-center gap-6 overflow-hidden rounded-3xl border border-primary/20 px-6 py-14 text-center shadow-xl shadow-navy-deep/40 sm:py-16">
         <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-primary">
-          🇺🇸 USA · 🇨🇦 Canada · 🇲🇽 Mexico
+          USA · Canada · Mexico
         </span>
         <h1 className="text-5xl font-extrabold tracking-tight sm:text-7xl">
           <span className="text-gradient-gold">FIFA World Cup</span>
@@ -32,7 +32,7 @@ export default async function Home() {
         </h1>
         <p className="max-w-xl text-base text-white/80">
           {WC.teams} teams · {WC.matches} matches · {WC.groups} groups across three
-          nations. The tournament kicks off June 11, 2026.
+          nations.
         </p>
         <CountdownTimer targetUtc={WC.openingMatchUtc} />
         <div className="flex flex-wrap justify-center gap-3">

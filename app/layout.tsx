@@ -19,6 +19,8 @@ export const metadata: Metadata = {
   },
   description:
     "Track all 48 teams, 104 matches, squads, live scores and group standings for the FIFA World Cup 2026.",
+  // Stop mobile browsers auto-linking times/dates (the "highlighted" date bug).
+  formatDetection: { telephone: false, date: false, email: false, address: false },
 };
 
 export default function RootLayout({
