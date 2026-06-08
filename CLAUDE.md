@@ -488,25 +488,27 @@ upload.wikimedia.org                                // stadium photos
 ## Development Phases
 
 ### Phase 1 — Pre-Tournament (Build Now, Before June 11)
-- [ ] Project setup (Next.js, Supabase, Tailwind, shadcn)
-- [ ] All API clients in `lib/api/`
-- [ ] Supabase schema migrations
-- [ ] Caching layer
-- [ ] Seed script + run it (all 48 teams, squads, players, fixtures)
-- [ ] Home page with countdown
-- [ ] Teams page + team detail pages
-- [ ] Player profile pages
-- [ ] Fixtures page (upcoming matches)
-- [ ] Groups / standings page (pre-populated, no results yet)
-- [ ] Mobile-responsive design throughout
+- [x] Project setup (Next.js, Supabase, Tailwind, shadcn)
+- [x] All API clients in `lib/api/`
+- [x] Supabase schema migrations
+- [x] Caching layer
+- [x] Seed script + run it (all 48 teams, squads, players, fixtures)
+- [x] Home page with countdown
+- [x] Teams page + team detail pages
+- [x] Player profile pages
+- [x] Fixtures page (upcoming matches)
+- [x] Groups / standings page (pre-populated, no results yet)
+- [x] Mobile-responsive design throughout (hamburger nav, mobile back button)
 - [ ] Deploy to Vercel
+- [x] Extra pages built: Stadiums (`/stadiums`), Knockout Bracket (`/bracket`), Top Scorers & Assisters (`/stats`)
+- [x] Navy/gold theme, ⚽ favicon, SEO/Open Graph + dynamic OG image, route progress bar
 
 ### Phase 2 — During Tournament (June 11+)
-- [ ] Live score polling on home + match pages
-- [ ] Match detail page with events, stats, lineups
-- [ ] Standings auto-update after each match
-- [ ] Player WC stats updating in real time
-- [ ] Top scorers / golden boot leaderboard
+- [~] Live score polling (match detail page polls; home shows a live section) — `lib/live.ts` `refreshMatch`
+- [x] Match detail page with events, stats, lineups (`components/matches/MatchDetail`)
+- [ ] Standings auto-update after each match (manual `wcstats`/`standings` seed steps for now)
+- [x] Player WC stats (`seedWCPlayerStats` → `players.stats_wc`, shown on profile + `/stats`)
+- [x] Top scorers / golden boot leaderboard (`/stats`)
 - [ ] Push notifications (Vercel + web push API) — optional
 
 ### Phase 3 — Mobile App (Capacitor)
