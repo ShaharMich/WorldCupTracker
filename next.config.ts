@@ -14,6 +14,16 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "upload.wikimedia.org" }, // stadium photos
     ],
   },
+  // Serve ads.txt via an API route (the static public/ads.txt was 404ing).
+  async redirects() {
+    return [
+      {
+        source: "/ads.txt",
+        destination: "/api/ads",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
