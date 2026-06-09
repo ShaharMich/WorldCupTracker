@@ -3,12 +3,25 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trophy } from "lucide-react";
+import { Trophy, Check, X } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { cn } from "@/lib/utils";
 
 interface Props {
   mode: "login" | "signup";
 }
+
+// Signup password policy. Each rule is shown live as the user types.
+const PASSWORD_RULES: { label: string; test: (pw: string) => boolean }[] = [
+  { label: "At least 8 characters", test: (pw) => pw.length >= 8 },
+  { label: "One uppercase letter", test: (pw) => /[A-Z]/.test(pw) },
+  { label: "One lowercase letter", test: (pw) => /[a-z]/.test(pw) },
+  { label: "One number", test: (pw) => /[0-9]/.test(pw) },
+  {
+    label: "One special character",
+    test: (pw) => /[^A-Za-z0-9]/.test(pw),
+  },
+];
 
 // Minimal email + password auth form shared by /login and /signup.
 export function AuthForm({ mode }: Props) {
@@ -19,13 +32,24 @@ export function AuthForm({ mode }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Only surface per-rule password errors after a submit attempt, so the form
+  // doesn't shout at the user before they've finished typing.
+  const [showPwErrors, setShowPwErrors] = useState(false);
 
   const isSignup = mode === "signup";
+  const passwordChecks = PASSWORD_RULES.map((r) => ({ ...r, met: r.test(password) }));
+  const passwordValid = passwordChecks.every((c) => c.met);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setNotice(null);
+
+    if (isSignup && !passwordValid) {
+      setShowPwErrors(true);
+      return;
+    }
+
     setBusy(true);
 
     const result = isSignup
@@ -90,12 +114,36 @@ export function AuthForm({ mode }: Props) {
               type="password"
               autoComplete={isSignup ? "new-password" : "current-password"}
               required
-              minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              aria-invalid={isSignup && showPwErrors && !passwordValid}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
               placeholder="••••••••"
             />
+
+            {isSignup ? (
+              <ul className="mt-2 space-y-1" aria-label="Password requirements">
+                {passwordChecks.map((c) => {
+                  // Before a submit attempt, unmet rules stay neutral; after,
+                  // they turn red so the user sees exactly what's missing.
+                  const tone = c.met
+                    ? "text-primary"
+                    : showPwErrors
+                      ? "text-destructive"
+                      : "text-muted-foreground";
+                  return (
+                    <li key={c.label} className={cn("flex items-center gap-1.5 text-xs", tone)}>
+                      {c.met ? (
+                        <Check className="size-3.5 shrink-0" />
+                      ) : (
+                        <X className="size-3.5 shrink-0" />
+                      )}
+                      <span>{c.label}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
           </div>
 
           {error ? (
