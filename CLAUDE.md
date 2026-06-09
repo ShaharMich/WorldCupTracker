@@ -306,7 +306,30 @@ CREATE TABLE standings (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(group_code, team_id)
 );
+
+-- ============================================================
+-- 6. Favorites (per-user saved teams + players) — requires Supabase Auth
+-- Owner-only RLS (auth.uid() = user_id). Run the updated supabase/schema.sql.
+-- ============================================================
+CREATE TABLE favorites (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('team','player')),
+  item_id INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, type, item_id)
+);
 ```
+
+---
+
+## Auth & Favorites
+
+Optional email/password auth via **Supabase Auth, client-side only** — uses the existing browser client `lib/supabase/client.ts` (default localStorage session); no `@supabase/ssr`, no middleware, no SSR cookies. **Login is always optional — nothing forces it.** Pages `/login` + `/signup` (`components/auth/AuthForm.tsx`); navbar top-right account icon is `components/auth/AuthMenu.tsx`.
+
+Two client contexts mounted via `components/providers/Providers.tsx` in the root layout: **`AuthProvider`** (`useAuth()` → `user/loading/signIn/signUp/signOut`) and **`FavoritesProvider`** (`useFavorites()` → `favorites:Set<"type:id">/ready/isFavorite/toggle`). Guests store favorites in **localStorage** (`wc2026:favorites`); logged-in users in the Supabase **`favorites`** table. On guest→login the local set **auto-migrates** to Supabase (upsert, ignore dupes) then localStorage clears. `lib/favorites.ts` holds the key helpers + localStorage I/O.
+
+`components/favorites/HeartButton.tsx` (filled = favorited) appears on **TeamCard, SquadTable rows, team detail header, PlayerHero**. Cards wrap content in an overlay-`<Link absolute inset-0>` + `pointer-events-none` so the heart (z-10) stays clickable without nesting a `<button>` in an `<a>`. The home page renders a client **`MyFavorites`** section (`#favorites`) that fetches favorited teams/players by id from the browser client.
 
 ---
 

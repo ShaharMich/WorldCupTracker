@@ -151,3 +151,34 @@ CREATE POLICY "public read matches" ON matches FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "public read standings" ON standings;
 CREATE POLICY "public read standings" ON standings FOR SELECT USING (true);
+
+-- ============================================================
+-- 6. Favorites (per-user saved teams + players)
+-- Requires Supabase Auth. Each row belongs to one authenticated
+-- user; RLS restricts all access to the owner.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS favorites (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('team', 'player')),
+  item_id INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, type, item_id)
+);
+CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
+
+ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
+
+-- Owner-only access: every policy checks the row's user_id against the
+-- authenticated user. No public/anon access at all.
+DROP POLICY IF EXISTS "favorites select own" ON favorites;
+CREATE POLICY "favorites select own" ON favorites
+  FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "favorites insert own" ON favorites;
+CREATE POLICY "favorites insert own" ON favorites
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "favorites delete own" ON favorites;
+CREATE POLICY "favorites delete own" ON favorites
+  FOR DELETE USING (auth.uid() = user_id);

@@ -1,20 +1,25 @@
 import Link from "next/link";
 import { PlayerPhoto } from "@/components/PlayerPhoto";
 import { TeamBadge } from "@/components/TeamBadge";
+import { HeartButton } from "@/components/favorites/HeartButton";
 import { POSITION_ORDER, positionGroup } from "@/lib/utils";
 import type { Player } from "@/types/player";
 
 function PlayerRow({ player }: { player: Player }) {
   return (
-    <Link
-      href={`/players/${player.id}`}
-      className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/50"
-    >
-      <span className="w-6 shrink-0 text-center text-sm tabular-nums text-muted-foreground">
+    <div className="relative flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/50">
+      <Link
+        href={`/players/${player.id}`}
+        className="absolute inset-0 z-0"
+        aria-label={player.name}
+      />
+      <span className="pointer-events-none w-6 shrink-0 text-center text-sm tabular-nums text-muted-foreground">
         {player.jersey_number ?? "—"}
       </span>
-      <PlayerPhoto src={player.photo_url} name={player.name} size={36} />
-      <span className="min-w-0 flex-1">
+      <span className="pointer-events-none">
+        <PlayerPhoto src={player.photo_url} name={player.name} size={36} />
+      </span>
+      <span className="pointer-events-none min-w-0 flex-1">
         <span className="block truncate font-medium">{player.name}</span>
         {player.club_name ? (
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -27,9 +32,12 @@ function PlayerRow({ player }: { player: Player }) {
         ) : null}
       </span>
       {player.age != null ? (
-        <span className="shrink-0 text-sm text-muted-foreground">{player.age}y</span>
+        <span className="pointer-events-none shrink-0 text-sm text-muted-foreground">
+          {player.age}y
+        </span>
       ) : null}
-    </Link>
+      <HeartButton type="player" itemId={player.id} name={player.name} className="relative z-10" />
+    </div>
   );
 }
 

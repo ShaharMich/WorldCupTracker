@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PlayerPhoto } from "@/components/PlayerPhoto";
 import { TeamBadge } from "@/components/TeamBadge";
+import { HeartButton } from "@/components/favorites/HeartButton";
 import type { Player } from "@/types/player";
 import type { Team } from "@/types/team";
 
@@ -16,6 +17,13 @@ export function PlayerHero({ player, team }: { player: Player; team: Team | null
               #{player.jersey_number}
             </span>
           ) : null}
+          <HeartButton
+            type="player"
+            itemId={player.id}
+            name={player.name}
+            size={22}
+            className="border border-border"
+          />
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground sm:justify-start">
           {player.position ? <span>{player.position}</span> : null}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CountdownTimer } from "@/components/layout/CountdownTimer";
 import { MatchCard } from "@/components/matches/MatchCard";
+import { MyFavorites } from "@/components/favorites/MyFavorites";
 import { EmptyState } from "@/components/EmptyState";
 import { WC } from "@/lib/constants";
 import {
@@ -56,6 +57,8 @@ export default async function Home() {
           />
         </div>
       ) : null}
+
+      <MyFavorites />
 
       {live.length > 0 ? (
         <section className="mt-10">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PlayerPhoto } from "@/components/PlayerPhoto";
 import { TeamBadge } from "@/components/TeamBadge";
+import { HeartButton } from "@/components/favorites/HeartButton";
 import { EmptyState } from "@/components/EmptyState";
 import { getStatLeaders, type PlayerWithTeam } from "@/lib/queries";
 import { pageMetadata } from "@/lib/seo";
@@ -31,33 +32,32 @@ function LeaderTable({
       </h2>
       <ol className="divide-y divide-border">
         {rows.map((p, i) => (
-          <li key={p.id}>
-            <Link
-              href={`/players/${p.id}`}
-              className="flex items-center gap-3 px-3 py-2 transition-colors hover:bg-secondary/50"
-            >
-              <span className="w-5 shrink-0 text-center text-sm font-bold tabular-nums text-muted-foreground">
-                {i + 1}
-              </span>
-              <PlayerPhoto src={p.photo_url} name={p.name} size={36} className="size-9 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{p.name}</p>
-                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  {p.team ? <TeamBadge team={p.team} size={14} /> : null}
-                  <span className="truncate">{p.team?.name ?? p.nationality ?? ""}</span>
-                </div>
+          <li key={p.id} className="relative flex items-center gap-3 px-3 py-2 transition-colors hover:bg-secondary/50">
+            <Link href={`/players/${p.id}`} className="absolute inset-0 z-0" aria-label={p.name} />
+            <span className="pointer-events-none w-5 shrink-0 text-center text-sm font-bold tabular-nums text-muted-foreground">
+              {i + 1}
+            </span>
+            <span className="pointer-events-none shrink-0">
+              <PlayerPhoto src={p.photo_url} name={p.name} size={36} className="size-9" />
+            </span>
+            <div className="pointer-events-none min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{p.name}</p>
+              <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                {p.team ? <TeamBadge team={p.team} size={14} /> : null}
+                <span className="truncate">{p.team?.name ?? p.nationality ?? ""}</span>
               </div>
-              {p.club_name ? (
-                <TeamBadge
-                  team={{ name: p.club_name, logo_url: p.club_logo_url, flag_url: null }}
-                  size={20}
-                  className="shrink-0"
-                />
-              ) : null}
-              <span className="w-7 shrink-0 text-right text-lg font-bold tabular-nums text-primary">
-                {stat(p)}
-              </span>
-            </Link>
+            </div>
+            {p.club_name ? (
+              <TeamBadge
+                team={{ name: p.club_name, logo_url: p.club_logo_url, flag_url: null }}
+                size={20}
+                className="pointer-events-none shrink-0"
+              />
+            ) : null}
+            <span className="pointer-events-none w-7 shrink-0 text-right text-lg font-bold tabular-nums text-primary">
+              {stat(p)}
+            </span>
+            <HeartButton type="player" itemId={p.id} name={p.name} size={16} className="relative z-10 shrink-0" />
           </li>
         ))}
       </ol>

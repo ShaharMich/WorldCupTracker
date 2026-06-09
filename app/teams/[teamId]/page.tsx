@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
 import { TeamBadge } from "@/components/TeamBadge";
 import { PlayerPhoto } from "@/components/PlayerPhoto";
+import { HeartButton } from "@/components/favorites/HeartButton";
 import { SquadTable } from "@/components/teams/SquadTable";
 import { StandingsTable } from "@/components/groups/StandingsTable";
 import { MatchCard } from "@/components/matches/MatchCard";
@@ -49,7 +50,16 @@ export default async function TeamDetailPage({
       <div className="mb-8 flex flex-wrap items-center gap-4">
         <TeamBadge team={team} size={56} />
         <div>
-          <h1 className="text-3xl font-bold">{team.name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold">{team.name}</h1>
+            <HeartButton
+              type="team"
+              itemId={team.id}
+              name={team.name}
+              size={22}
+              className="border border-border"
+            />
+          </div>
           <p className="text-sm text-muted-foreground">
             {team.group_code ? `Group ${team.group_code}` : "Group TBD"}
             {team.confederation ? ` · ${team.confederation}` : ""}

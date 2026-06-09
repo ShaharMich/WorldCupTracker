@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { NAV_LINKS } from "@/lib/constants";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { AuthMenu } from "@/components/auth/AuthMenu";
 
 export function Navbar() {
   return (
@@ -14,21 +15,26 @@ export function Navbar() {
           <span className="text-gradient-gold">World Cup 2026</span>
         </Link>
 
-        {/* Inline links at md+; hamburger below md. */}
-        <ul className="hidden items-center gap-0.5 text-sm font-medium md:flex">
-          {NAV_LINKS.map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                className="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="flex items-center gap-1">
+          {/* Inline links at md+; hamburger below md. */}
+          <ul className="hidden items-center gap-0.5 text-sm font-medium md:flex">
+            {NAV_LINKS.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
 
-        <MobileNav />
+          {/* Account icon — visible at all breakpoints, top right. */}
+          <AuthMenu />
+
+          <MobileNav />
+        </div>
       </nav>
     </header>
   );
