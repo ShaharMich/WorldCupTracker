@@ -17,6 +17,7 @@ import {
   type FDMatch,
 } from "@/lib/api/football-data";
 import { venueForMatch } from "@/lib/venues";
+import { fifaRankFor } from "@/lib/fifa-rankings";
 import { sleep } from "@/lib/utils";
 import type {
   AFPlayerResponse,
@@ -386,6 +387,41 @@ export async function seedFixtures(log: Logger = noop): Promise<void> {
   const { error } = await db.from("matches").upsert(rows, { onConflict: "id" });
   if (error) throw new Error(`matches upsert failed: ${error.message}`);
   log(`Upserted ${rows.length} fixtures.`);
+}
+
+// Seeds each team's current FIFA world ranking from the hardcoded catalog
+// (lib/fifa-rankings.ts) — API-Football has no FIFA-ranking endpoint. Matches by
+// team name; teams without a catalog entry keep a null rank (no badge shown).
+// Re-run after FIFA publishes a new monthly list (update the catalog first).
+export async function seedFifaRankings(log: Logger = noop): Promise<void> {
+  const db = getServerSupabase();
+  log("Seeding FIFA world rankings (hardcoded catalog)...");
+  const { data, error } = await db.from("teams").select("id,name");
+  if (error) throw new Error(`teams lookup failed: ${error.message}`);
+  const teams = data ?? [];
+  if (teams.length === 0) {
+    log("No teams in the table — run the teams step first.");
+    return;
+  }
+
+  const unmatched: string[] = [];
+  const rows = teams.flatMap((t) => {
+    const rank = fifaRankFor(t.name as string);
+    if (rank == null) {
+      unmatched.push(t.name as string);
+      return [];
+    }
+    // Carry `name` so the upsert's INSERT path satisfies the NOT NULL column;
+    // on the (always-taken) UPDATE path only fifa_rank/updated_at change.
+    return [{ id: t.id as number, name: t.name as string, fifa_rank: rank, updated_at: new Date().toISOString() }];
+  });
+
+  if (rows.length) {
+    const { error: upErr } = await db.from("teams").upsert(rows, { onConflict: "id" });
+    if (upErr) throw new Error(`fifa_rank upsert failed: ${upErr.message}`);
+  }
+  log(`Set FIFA rank on ${rows.length}/${teams.length} teams.`);
+  if (unmatched.length) log(`  No ranking in catalog for: ${unmatched.join(", ")}`);
 }
 
 // ---------- football-data <-> API-Football team crosswalk ----------
@@ -783,6 +819,7 @@ export interface SeedOptions {
   players?: boolean;
   fixtures?: boolean;
   coaches?: boolean;
+  rankings?: boolean;
   standings?: boolean;
   wcstats?: boolean;
 }
@@ -793,6 +830,7 @@ export async function runSeed(
     players: true,
     fixtures: true,
     coaches: true,
+    rankings: true,
     standings: true,
     wcstats: true,
   },
@@ -800,6 +838,7 @@ export async function runSeed(
 ): Promise<void> {
   if (opts.teams) await seedTeams(log);
   if (opts.fixtures) await seedFixtures(log);
+  if (opts.rankings) await seedFifaRankings(log);
   if (opts.players) await seedPlayersFromApiFootball(log);
   if (opts.coaches) await seedCoaches(log);
   if (opts.standings) await seedStandings(log);

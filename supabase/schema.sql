@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS teams (
   flag_url TEXT,
   group_code TEXT,
   confederation TEXT,
+  fifa_rank INTEGER,
   wc_appearances INTEGER,
   wc_titles INTEGER DEFAULT 0,
   coach_id INTEGER,
@@ -42,6 +43,7 @@ ALTER TABLE teams ADD COLUMN IF NOT EXISTS coach_id INTEGER;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS coach_name TEXT;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS coach_photo_url TEXT;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS coach_nationality TEXT;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS fifa_rank INTEGER;
 
 -- ------------------------------------------------------------
 -- 3. Players

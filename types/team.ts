@@ -13,6 +13,7 @@ export interface Team {
   flag_url: string | null;
   group_code: string | null;
   confederation: string | null;
+  fifa_rank: number | null;
   wc_appearances: number | null;
   wc_titles: number;
   coach_id: number | null;

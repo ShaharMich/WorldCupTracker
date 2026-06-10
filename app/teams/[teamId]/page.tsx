@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BackButton } from "@/components/BackButton";
 import { TeamBadge } from "@/components/TeamBadge";
+import { FifaRankBadge } from "@/components/teams/FifaRankBadge";
 import { PlayerPhoto } from "@/components/PlayerPhoto";
 import { HeartButton } from "@/components/favorites/HeartButton";
 import { SquadTable } from "@/components/teams/SquadTable";
@@ -50,8 +51,9 @@ export default async function TeamDetailPage({
       <div className="mb-8 flex flex-wrap items-center gap-4">
         <TeamBadge team={team} size={56} />
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-3xl font-bold">{team.name}</h1>
+            {team.fifa_rank != null ? <FifaRankBadge rank={team.fifa_rank} label /> : null}
             <HeartButton
               type="team"
               itemId={team.id}
