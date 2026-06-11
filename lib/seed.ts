@@ -19,7 +19,7 @@ import {
 import { venueForMatch } from "@/lib/venues";
 import { fifaRankFor } from "@/lib/fifa-rankings";
 import { refreshMatch } from "@/lib/live";
-import { isLiveStatus } from "@/types/match";
+import { isLiveStatus, LIVE_STATUSES } from "@/types/match";
 import { sleep } from "@/lib/utils";
 import type {
   AFPlayerResponse,
@@ -893,6 +893,36 @@ export async function seedWCPlayerStats(log: Logger = noop): Promise<void> {
 // fetches by af_fixture_id and writes the row). No-op when nothing is in play.
 export async function seedLiveMatches(log: Logger = noop): Promise<void> {
   const db = getServerSupabase();
+
+  // Match-window gate (DB-only — no API cost). Before spending any API-Football
+  // budget on live discovery, confirm there's actually a match worth refreshing:
+  // one kicking off within the next 2h, or one that kicked off recently enough to
+  // still be in progress (a match runs up to ~2.5h with extra time + penalties;
+  // 3h is a safe lookback), or any row the DB already marks live. Off-hours this
+  // short-circuits with zero API calls.
+  const now = Date.now();
+  const windowStart = new Date(now - 3 * 60 * 60 * 1000).toISOString(); // kicked off up to 3h ago
+  const windowEnd = new Date(now + 2 * 60 * 60 * 1000).toISOString(); // kicks off within 2h
+  const { data: upcoming, error: windowErr } = await db
+    .from("matches")
+    .select("id")
+    .gte("kickoff_utc", windowStart)
+    .lte("kickoff_utc", windowEnd)
+    .limit(1);
+  if (windowErr) throw new Error(`match-window lookup failed: ${windowErr.message}`);
+
+  const { data: liveRows, error: liveErr } = await db
+    .from("matches")
+    .select("id")
+    .in("status", LIVE_STATUSES)
+    .limit(1);
+  if (liveErr) throw new Error(`live-status lookup failed: ${liveErr.message}`);
+
+  if ((upcoming?.length ?? 0) === 0 && (liveRows?.length ?? 0) === 0) {
+    log("No match within window (next 2h / in progress) — skipping live refresh.");
+    return;
+  }
+
   log("Finding in-play matches (API-Football)...");
 
   // Discovering in-play fixtures hits API-Football, which signals a quota or
