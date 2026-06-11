@@ -4,7 +4,7 @@ import { BackButton } from "@/components/BackButton";
 import { MatchDetail } from "@/components/matches/MatchDetail";
 import { getMatch } from "@/lib/queries";
 
-export const revalidate = 60;
+export const revalidate = 30;
 
 export async function generateMetadata({
   params,

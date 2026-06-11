@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   const steps = url.searchParams.getAll("step");
   const opts: SeedOptions =
     steps.length === 0
-      ? { teams: true, players: true, fixtures: true, fixturemap: true, coaches: true, rankings: true, standings: true, wcstats: true }
+      ? { teams: true, players: true, fixtures: true, fixturemap: true, coaches: true, rankings: true, standings: true, wcstats: true, live: true }
       : {
           teams: steps.includes("teams"),
           players: steps.includes("players"),
@@ -34,6 +34,7 @@ export async function POST(req: Request) {
           rankings: steps.includes("rankings"),
           standings: steps.includes("standings"),
           wcstats: steps.includes("wcstats"),
+          live: steps.includes("live"),
         };
 
   const logs: string[] = [];

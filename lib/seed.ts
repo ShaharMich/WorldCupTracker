@@ -18,6 +18,8 @@ import {
 } from "@/lib/api/football-data";
 import { venueForMatch } from "@/lib/venues";
 import { fifaRankFor } from "@/lib/fifa-rankings";
+import { refreshMatch } from "@/lib/live";
+import { isLiveStatus } from "@/types/match";
 import { sleep } from "@/lib/utils";
 import type {
   AFPlayerResponse,
@@ -883,6 +885,54 @@ export async function seedWCPlayerStats(log: Logger = noop): Promise<void> {
   log(`Updated stats_wc for ${updated} players.`);
 }
 
+// Refreshes every in-play match from API-Football so live scores/events/stats
+// stay current site-wide without anyone holding a match page open. Live matches
+// are discovered from API-Football (the source of truth), so a match the DB
+// still has as "NS" isn't missed; we union that with any row the DB already
+// marks live (in case the AF list lags a tick), then call refreshMatch (which
+// fetches by af_fixture_id and writes the row). No-op when nothing is in play.
+export async function seedLiveMatches(log: Logger = noop): Promise<void> {
+  const db = getServerSupabase();
+  log("Finding in-play matches (API-Football)...");
+
+  const fixtures = await fetchFixtures();
+  const liveAfIds = new Set(
+    fixtures.filter((f) => isLiveStatus(f.fixture.status.short)).map((f) => f.fixture.id),
+  );
+
+  const { data: rows, error } = await db
+    .from("matches")
+    .select("id,af_fixture_id,status")
+    .not("af_fixture_id", "is", null);
+  if (error) throw new Error(`matches lookup failed: ${error.message}`);
+
+  const targets = (rows ?? []).filter(
+    (m) => liveAfIds.has(m.af_fixture_id as number) || isLiveStatus(m.status as string),
+  );
+  if (targets.length === 0) {
+    log("No in-play matches — nothing to refresh.");
+    return;
+  }
+
+  log(`Refreshing ${targets.length} in-play match(es)...`);
+  let refreshed = 0;
+  for (const m of targets) {
+    try {
+      const updated = await refreshMatch(m.id as number);
+      if (updated) {
+        refreshed++;
+        log(
+          `  match ${m.id}: ${updated.status} ` +
+            `${updated.home_score ?? "-"}-${updated.away_score ?? "-"} (${updated.elapsed ?? "-"}').`,
+        );
+      }
+    } catch (e) {
+      log(`  match ${m.id} refresh failed: ${(e as Error).message}`);
+    }
+  }
+  log(`Refreshed ${refreshed}/${targets.length} in-play matches.`);
+}
+
 export interface SeedOptions {
   teams?: boolean;
   players?: boolean;
@@ -892,6 +942,7 @@ export interface SeedOptions {
   rankings?: boolean;
   standings?: boolean;
   wcstats?: boolean;
+  live?: boolean;
 }
 
 export async function runSeed(
@@ -904,6 +955,7 @@ export async function runSeed(
     rankings: true,
     standings: true,
     wcstats: true,
+    live: true,
   },
   log: Logger = noop,
 ): Promise<void> {
@@ -915,5 +967,6 @@ export async function runSeed(
   if (opts.coaches) await seedCoaches(log);
   if (opts.standings) await seedStandings(log);
   if (opts.wcstats) await seedWCPlayerStats(log);
+  if (opts.live) await seedLiveMatches(log);
   log("Seed complete.");
 }

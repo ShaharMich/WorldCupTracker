@@ -9,7 +9,7 @@ import { runSeed, type SeedOptions } from "@/lib/seed";
 const args = process.argv.slice(2);
 const opts: SeedOptions =
   args.length === 0
-    ? { teams: true, players: true, fixtures: true, fixturemap: true, coaches: true, rankings: true, standings: true, wcstats: true }
+    ? { teams: true, players: true, fixtures: true, fixturemap: true, coaches: true, rankings: true, standings: true, wcstats: true, live: true }
     : {
         teams: args.includes("teams"),
         players: args.includes("players"),
@@ -19,6 +19,7 @@ const opts: SeedOptions =
         rankings: args.includes("rankings"),
         standings: args.includes("standings"),
         wcstats: args.includes("wcstats"),
+        live: args.includes("live"),
       };
 
 const log = (msg: string) => console.log(`[seed] ${msg}`);

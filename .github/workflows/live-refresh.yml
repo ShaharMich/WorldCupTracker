@@ -1,0 +1,54 @@
+name: Refresh live matches
+
+# Refreshes every in-play match (scores/events/stats/lineups) from API-Football
+# so the site stays current without anyone holding a match page open. Hits the
+# app's seed endpoint (step=live) during the tournament.
+#
+# Setup (one-time) — same secrets as the wcstats workflow:
+#   Repo Settings -> Secrets and variables -> Actions:
+#     REVALIDATE_SECRET  = the same value as the app's REVALIDATE_SECRET env var
+#     APP_URL (optional) = production base URL; otherwise edit the default below
+#
+# NOTE: cron requests every 2 minutes, but GitHub Actions enforces a ~5-minute
+# minimum for scheduled workflows and may delay further under load — so real
+# cadence is roughly every 5 min. The 60s in-page client poll covers viewers in
+# real time; this job keeps the DB fresh for everyone else. For a guaranteed
+# 2-min cadence use an external pinger (e.g. cron-job.org) against the same URL.
+
+on:
+  schedule:
+    # Every 2 min during June 11-30 and July 1-19 (UTC). Cron has no year field;
+    # the job guards on the 2026 window below.
+    - cron: "*/2 * 11-30 6 *"
+    - cron: "*/2 * 1-19 7 *"
+  workflow_dispatch: # allow manual runs for testing
+
+concurrency:
+  group: live-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger live refresh (within tournament window)
+        env:
+          APP_URL: ${{ secrets.APP_URL || 'https://wc2026-tracker.vercel.app' }}
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: |
+          set -euo pipefail
+          today="$(date -u +%Y-%m-%d)"
+          # Skip outside the 2026 tournament window (manual dispatch always runs).
+          # [[ ]] does lexicographic comparison, which is correct for ISO dates.
+          if [[ "${{ github.event_name }}" == "schedule" && ( "$today" < "2026-06-11" || "$today" > "2026-07-19" ) ]]; then
+            echo "Outside tournament window ($today); skipping."
+            exit 0
+          fi
+          if [ -z "${REVALIDATE_SECRET:-}" ]; then
+            echo "REVALIDATE_SECRET secret is not set; aborting." >&2
+            exit 1
+          fi
+          echo "Refreshing live matches via $APP_URL ..."
+          curl -fsS -X POST "$APP_URL/api/seed?step=live" \
+            -H "Authorization: Bearer $REVALIDATE_SECRET" \
+            --max-time 300
