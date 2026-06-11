@@ -895,7 +895,18 @@ export async function seedLiveMatches(log: Logger = noop): Promise<void> {
   const db = getServerSupabase();
   log("Finding in-play matches (API-Football)...");
 
-  const fixtures = await fetchFixtures();
+  // Discovering in-play fixtures hits API-Football, which signals a quota or
+  // rate-limit by throwing (non-200, or 200 with an `errors` object). A frequent
+  // cron pinging this is an expected way to exhaust the daily budget, so treat a
+  // discovery failure as "nothing to refresh" and return cleanly rather than
+  // 500-ing the whole request.
+  let fixtures: Awaited<ReturnType<typeof fetchFixtures>>;
+  try {
+    fixtures = await fetchFixtures();
+  } catch (e) {
+    log(`Live discovery skipped (API-Football unavailable): ${(e as Error).message}`);
+    return;
+  }
   const liveAfIds = new Set(
     fixtures.filter((f) => isLiveStatus(f.fixture.status.short)).map((f) => f.fixture.id),
   );
