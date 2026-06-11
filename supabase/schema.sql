@@ -104,11 +104,17 @@ CREATE TABLE IF NOT EXISTS matches (
   events JSONB,
   stats JSONB,
   lineups JSONB,
+  af_fixture_id INTEGER,      -- API-Football fixture id (our id is football-data's)
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_matches_kickoff ON matches(kickoff_utc);
 CREATE INDEX IF NOT EXISTS idx_matches_status ON matches(status);
 CREATE INDEX IF NOT EXISTS idx_matches_stage ON matches(stage);
+
+-- Migration for existing databases: our matches.id is the football-data id, but
+-- API-Football fixtures use unrelated ids. We crosswalk and store the AF fixture
+-- id here so live refresh (events/stats/lineups) can fetch the right fixture.
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS af_fixture_id INTEGER;
 
 -- ------------------------------------------------------------
 -- 5. Standings

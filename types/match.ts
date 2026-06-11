@@ -68,6 +68,7 @@ export interface Match {
   events: MatchEvent[] | null;
   stats: MatchStatItem[] | null;
   lineups: TeamLineup[] | null;
+  af_fixture_id: number | null;
   updated_at: string;
 }
 

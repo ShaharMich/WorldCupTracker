@@ -11,7 +11,7 @@ import { isLiveStatus } from "@/types/match";
 import type { MatchWithTeams, MatchEvent, MatchStatItem, TeamLineup } from "@/types/match";
 import type { AFFixtureEvent, AFFixtureStatistics, AFLineupEntry } from "@/types/api";
 
-function mapEvents(events: AFFixtureEvent[]): MatchEvent[] {
+export function mapEvents(events: AFFixtureEvent[]): MatchEvent[] {
   return events.map((e) => ({
     type: e.type,
     team: e.team?.name ?? null,
@@ -23,7 +23,7 @@ function mapEvents(events: AFFixtureEvent[]): MatchEvent[] {
   }));
 }
 
-function mapStats(stats: AFFixtureStatistics[]): MatchStatItem[] {
+export function mapStats(stats: AFFixtureStatistics[]): MatchStatItem[] {
   const home = stats[0]?.statistics ?? [];
   const away = stats[1]?.statistics ?? [];
   return home.map((s, i) => ({
@@ -33,7 +33,7 @@ function mapStats(stats: AFFixtureStatistics[]): MatchStatItem[] {
   }));
 }
 
-function mapLineups(lineups: AFLineupEntry[]): TeamLineup[] {
+export function mapLineups(lineups: AFLineupEntry[]): TeamLineup[] {
   return lineups.map((l) => ({
     team_id: l.team?.id ?? null,
     team_name: l.team?.name ?? null,
@@ -58,15 +58,23 @@ function mapLineups(lineups: AFLineupEntry[]): TeamLineup[] {
 
 // Pulls fresh fixture/events/stats/lineups for a match, persists them, and
 // returns the merged record. Uses a 60s cache to respect rate limits.
+//
+// Our matches.id is a football-data id, but API-Football fixtures use unrelated
+// ids — so we fetch by the crosswalked af_fixture_id stored on the row (seeded
+// by the `fixturemap` step). Without it we can't reach the right fixture, so we
+// return the cached record unchanged rather than querying with the wrong id.
 export async function refreshMatch(id: number): Promise<MatchWithTeams | null> {
   const existing = await getMatch(id);
   if (!existing) return null;
 
+  const afId = existing.af_fixture_id;
+  if (afId == null) return existing;
+
   const [fixtures, events, stats, lineups] = await Promise.all([
-    getCached(`af:fixture:${id}`, () => fetchFixtureById(id), 1),
-    getCached(`af:events:${id}`, () => fetchFixtureEvents(id), 1),
-    getCached(`af:stats:${id}`, () => fetchFixtureStatistics(id), 1),
-    getCached(`af:lineups:${id}`, () => fetchFixtureLineups(id), 1),
+    getCached(`af:fixture:${afId}`, () => fetchFixtureById(afId), 1),
+    getCached(`af:events:${afId}`, () => fetchFixtureEvents(afId), 1),
+    getCached(`af:stats:${afId}`, () => fetchFixtureStatistics(afId), 1),
+    getCached(`af:lineups:${afId}`, () => fetchFixtureLineups(afId), 1),
   ]);
 
   const fx = fixtures[0];

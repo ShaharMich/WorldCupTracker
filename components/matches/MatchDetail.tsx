@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { TeamBadge } from "@/components/TeamBadge";
+import type { Team } from "@/types/team";
 import { LocalTime } from "@/components/LocalTime";
 import { LiveBadge } from "@/components/matches/LiveBadge";
 import { MatchStats } from "@/components/matches/MatchStats";
@@ -51,6 +53,28 @@ function Lineups({ lineups }: { lineups: TeamLineup[] | null }) {
   );
 }
 
+// A team's crest + name. Links to the team page when the team is known; renders
+// a plain (non-link) TBD slot for unfilled knockout placeholders.
+function TeamSlot({ team, fallbackName }: { team: Team | null; fallbackName: string }) {
+  const inner = (
+    <>
+      <TeamBadge team={team} size={56} fallbackName={fallbackName} />
+      <span className="font-medium">{team?.name ?? `${fallbackName} TBD`}</span>
+    </>
+  );
+  if (!team) {
+    return <div className="flex flex-col items-center gap-2 text-center">{inner}</div>;
+  }
+  return (
+    <Link
+      href={`/teams/${team.id}`}
+      className="flex flex-col items-center gap-2 rounded-lg p-2 text-center transition-colors hover:bg-muted"
+    >
+      {inner}
+    </Link>
+  );
+}
+
 export function MatchDetail({ initial }: { initial: MatchWithTeams }) {
   const [match, setMatch] = useState(initial);
   const live = isLiveStatus(match.status);
@@ -83,10 +107,7 @@ export function MatchDetail({ initial }: { initial: MatchWithTeams }) {
           </span>
         </div>
         <div className="grid grid-cols-3 items-center gap-4">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <TeamBadge team={match.home_team} size={56} fallbackName="Home" />
-            <span className="font-medium">{match.home_team?.name ?? "Home TBD"}</span>
-          </div>
+          <TeamSlot team={match.home_team} fallbackName="Home" />
           <div className="flex flex-col items-center gap-1">
             {hasScore ? (
               <span className="text-4xl font-bold tabular-nums">
@@ -110,10 +131,7 @@ export function MatchDetail({ initial }: { initial: MatchWithTeams }) {
               </span>
             ) : null}
           </div>
-          <div className="flex flex-col items-center gap-2 text-center">
-            <TeamBadge team={match.away_team} size={56} fallbackName="Away" />
-            <span className="font-medium">{match.away_team?.name ?? "Away TBD"}</span>
-          </div>
+          <TeamSlot team={match.away_team} fallbackName="Away" />
         </div>
         <p className="mt-4 text-center text-sm text-muted-foreground">
           {match.venue ?? "Stadium TBD"}

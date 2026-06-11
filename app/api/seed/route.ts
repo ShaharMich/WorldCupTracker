@@ -24,11 +24,12 @@ export async function POST(req: Request) {
   const steps = url.searchParams.getAll("step");
   const opts: SeedOptions =
     steps.length === 0
-      ? { teams: true, players: true, fixtures: true, coaches: true, rankings: true, standings: true, wcstats: true }
+      ? { teams: true, players: true, fixtures: true, fixturemap: true, coaches: true, rankings: true, standings: true, wcstats: true }
       : {
           teams: steps.includes("teams"),
           players: steps.includes("players"),
           fixtures: steps.includes("fixtures"),
+          fixturemap: steps.includes("fixturemap"),
           coaches: steps.includes("coaches"),
           rankings: steps.includes("rankings"),
           standings: steps.includes("standings"),

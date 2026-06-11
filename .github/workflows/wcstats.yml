@@ -1,0 +1,52 @@
+name: Seed WC stats
+
+# Aggregates WC 2026 player stats (and match results) by hitting the app's seed
+# endpoint every 30 minutes during the tournament. GitHub-hosted runners are free
+# for this, so it replaces the Vercel cron.
+#
+# Setup (one-time):
+#   1. Repo Settings -> Secrets and variables -> Actions -> New repository secret:
+#        REVALIDATE_SECRET  = the same value as the app's REVALIDATE_SECRET env var
+#        APP_URL (optional) = production base URL; otherwise edit the default below
+#   2. Scheduled workflows only run from the repo's DEFAULT branch, and GitHub may
+#      delay them under load. They also auto-disable after 60 days of repo
+#      inactivity — re-enable from the Actions tab if that happens.
+
+on:
+  schedule:
+    # Cron has no year field, so the months/days below also match in other years;
+    # the job step guards against that by checking the 2026 date window. Every
+    # 30 min during June 11-30 and July 1-19 (times are UTC).
+    - cron: "*/30 * 11-30 6 *"
+    - cron: "*/30 * 1-19 7 *"
+  workflow_dispatch: # allow manual runs for testing
+
+concurrency:
+  group: wcstats
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger wcstats seed (within tournament window)
+        env:
+          APP_URL: ${{ secrets.APP_URL || 'https://wc2026-tracker.vercel.app' }}
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: |
+          set -euo pipefail
+          today="$(date -u +%Y-%m-%d)"
+          # Skip outside the 2026 tournament window (manual dispatch always runs).
+          # [[ ]] does lexicographic comparison, which is correct for ISO dates.
+          if [[ "${{ github.event_name }}" == "schedule" && ( "$today" < "2026-06-11" || "$today" > "2026-07-19" ) ]]; then
+            echo "Outside tournament window ($today); skipping."
+            exit 0
+          fi
+          if [ -z "${REVALIDATE_SECRET:-}" ]; then
+            echo "REVALIDATE_SECRET secret is not set; aborting." >&2
+            exit 1
+          fi
+          echo "Seeding wcstats via $APP_URL ..."
+          curl -fsS -X POST "$APP_URL/api/seed?step=wcstats" \
+            -H "Authorization: Bearer $REVALIDATE_SECRET" \
+            --max-time 300

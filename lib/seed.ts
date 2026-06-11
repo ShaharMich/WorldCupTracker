@@ -389,6 +389,75 @@ export async function seedFixtures(log: Logger = noop): Promise<void> {
   log(`Upserted ${rows.length} fixtures.`);
 }
 
+// Crosswalks our football-data fixtures to API-Football fixture ids and stores
+// each on matches.af_fixture_id, so live refresh (events/stats/lineups) can fetch
+// the right fixture. Both feeds cover the same 104 games but use unrelated
+// fixture ids; we match on the (unordered) team pair, disambiguating with the
+// kickoff date when a pair recurs. Knockout fixtures whose teams aren't drawn yet
+// (null team ids on either side) are skipped — re-run after each round is set.
+export async function seedFixtureCrosswalk(log: Logger = noop): Promise<void> {
+  const db = getServerSupabase();
+  log("Crosswalking fixtures to API-Football ids...");
+
+  // af team id -> our (football-data) team id, so we can translate AF fixtures.
+  const { fdByAf } = await buildTeamCrosswalk(log);
+
+  const { data: ourMatches, error } = await db
+    .from("matches")
+    .select("id,home_team_id,away_team_id,kickoff_utc");
+  if (error) throw new Error(`matches lookup failed: ${error.message}`);
+
+  // Key our matches by unordered fd team pair; a pair can recur (group + a later
+  // knockout), so keep a list and disambiguate by date below.
+  const pairKey = (a: number, b: number) => [a, b].sort((x, y) => x - y).join("-");
+  const day = (iso: string) => iso.slice(0, 10);
+  const byPair = new Map<string, { id: number; date: string }[]>();
+  for (const m of ourMatches ?? []) {
+    if (m.home_team_id == null || m.away_team_id == null) continue;
+    const k = pairKey(m.home_team_id, m.away_team_id);
+    if (!byPair.has(k)) byPair.set(k, []);
+    byPair.get(k)!.push({ id: m.id as number, date: day(m.kickoff_utc as string) });
+  }
+
+  const fixtures = await fetchFixtures();
+  const updates: { id: number; af_fixture_id: number }[] = [];
+  let unresolvedTeams = 0;
+  let noMatch = 0;
+  for (const f of fixtures) {
+    const homeFd = fdByAf.get(f.teams.home.id);
+    const awayFd = fdByAf.get(f.teams.away.id);
+    if (homeFd == null || awayFd == null) {
+      unresolvedTeams++;
+      continue; // a placeholder/unknown team — can't map yet
+    }
+    const candidates = byPair.get(pairKey(homeFd, awayFd)) ?? [];
+    const chosen =
+      candidates.length === 1
+        ? candidates[0]
+        : candidates.find((c) => c.date === day(f.fixture.date));
+    if (!chosen) {
+      noMatch++;
+      continue;
+    }
+    updates.push({ id: chosen.id, af_fixture_id: f.fixture.id });
+  }
+
+  // Update one row at a time (a bulk upsert would need every NOT NULL column).
+  let written = 0;
+  for (const u of updates) {
+    const { error: upErr } = await db
+      .from("matches")
+      .update({ af_fixture_id: u.af_fixture_id, updated_at: new Date().toISOString() })
+      .eq("id", u.id);
+    if (upErr) log(`  match ${u.id} af id update failed: ${upErr.message}`);
+    else written++;
+  }
+  log(
+    `Mapped ${written}/${fixtures.length} fixtures to AF ids ` +
+      `(skipped ${unresolvedTeams} with undrawn teams, ${noMatch} with no local match).`,
+  );
+}
+
 // Seeds each team's current FIFA world ranking from the hardcoded catalog
 // (lib/fifa-rankings.ts) — API-Football has no FIFA-ranking endpoint. Matches by
 // team name; teams without a catalog entry keep a null rank (no badge shown).
@@ -818,6 +887,7 @@ export interface SeedOptions {
   teams?: boolean;
   players?: boolean;
   fixtures?: boolean;
+  fixturemap?: boolean;
   coaches?: boolean;
   rankings?: boolean;
   standings?: boolean;
@@ -829,6 +899,7 @@ export async function runSeed(
     teams: true,
     players: true,
     fixtures: true,
+    fixturemap: true,
     coaches: true,
     rankings: true,
     standings: true,
@@ -838,6 +909,7 @@ export async function runSeed(
 ): Promise<void> {
   if (opts.teams) await seedTeams(log);
   if (opts.fixtures) await seedFixtures(log);
+  if (opts.fixturemap) await seedFixtureCrosswalk(log);
   if (opts.rankings) await seedFifaRankings(log);
   if (opts.players) await seedPlayersFromApiFootball(log);
   if (opts.coaches) await seedCoaches(log);
