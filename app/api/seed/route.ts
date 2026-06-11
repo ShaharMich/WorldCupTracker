@@ -26,12 +26,14 @@ function authorized(req: Request): boolean {
 
 // Collect step names from any of: a string ("live"), a comma-separated string
 // ("live,wcstats"), or an array. Unknown tokens are ignored.
+const ALL_STEPS = "all";
+
 function collectSteps(value: unknown, into: Set<string>): void {
   const push = (s: string) =>
     s
       .split(",")
       .map((t) => t.trim())
-      .filter((t) => (STEP_NAMES as readonly string[]).includes(t))
+      .filter((t) => t === ALL_STEPS || (STEP_NAMES as readonly string[]).includes(t))
       .forEach((t) => into.add(t));
   if (typeof value === "string") push(value);
   else if (Array.isArray(value)) value.forEach((v) => typeof v === "string" && push(v));
@@ -81,20 +83,34 @@ export async function POST(req: Request) {
 
   const url = new URL(req.url);
   const steps = await readSteps(req, url);
-  const opts: SeedOptions =
-    steps.length === 0
-      ? { teams: true, players: true, fixtures: true, fixturemap: true, coaches: true, rankings: true, standings: true, wcstats: true, live: true }
-      : {
-          teams: steps.includes("teams"),
-          players: steps.includes("players"),
-          fixtures: steps.includes("fixtures"),
-          fixturemap: steps.includes("fixturemap"),
-          coaches: steps.includes("coaches"),
-          rankings: steps.includes("rankings"),
-          standings: steps.includes("standings"),
-          wcstats: steps.includes("wcstats"),
-          live: steps.includes("live"),
-        };
+
+  // Require an explicit step. An empty/unrecognized list used to fall through to
+  // a full seed, so one misconfigured caller (e.g. step in the wrong place) could
+  // silently run teams/players/fixtures. Fail loud instead; use step=all to opt
+  // into the full seed on purpose.
+  if (steps.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "No valid step specified. Pass ?step=<name> (or step in the body), " +
+          `comma-separated for several, or step=all for everything. Valid steps: ${STEP_NAMES.join(", ")}.`,
+      },
+      { status: 400 },
+    );
+  }
+
+  const runAll = steps.includes(ALL_STEPS);
+  const opts: SeedOptions = {
+    teams: runAll || steps.includes("teams"),
+    players: runAll || steps.includes("players"),
+    fixtures: runAll || steps.includes("fixtures"),
+    fixturemap: runAll || steps.includes("fixturemap"),
+    coaches: runAll || steps.includes("coaches"),
+    rankings: runAll || steps.includes("rankings"),
+    standings: runAll || steps.includes("standings"),
+    wcstats: runAll || steps.includes("wcstats"),
+    live: runAll || steps.includes("live"),
+  };
 
   const logs: string[] = [];
   try {
