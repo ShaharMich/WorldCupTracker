@@ -4,24 +4,26 @@ name: Refresh live matches
 # so the site stays current without anyone holding a match page open. Hits the
 # app's seed endpoint (step=live) during the tournament.
 #
-# Setup (one-time) — same secrets as the wcstats workflow:
+# ⚠️ SCHEDULE DISABLED (2026-06-12): live refresh is now driven by an external
+# pinger (cron-job.org) hitting POST /api/seed?step=live every 2 min — a true
+# 2-min cadence that GitHub's ~5-min scheduled-workflow floor can't match. This
+# workflow's cron was therefore redundant AND was failing every run (the
+# REVALIDATE_SECRET Actions secret isn't set), spamming failure emails. The
+# schedule is removed; the job is kept as workflow_dispatch-only so it can still
+# be triggered manually for testing. To restore automated runs, add the
+# REVALIDATE_SECRET (and optional APP_URL) Actions secrets and re-add the cron
+# block below — but prefer cron-job.org for the tighter cadence.
+#
+# Setup for manual dispatch — same secrets as the wcstats workflow:
 #   Repo Settings -> Secrets and variables -> Actions:
 #     REVALIDATE_SECRET  = the same value as the app's REVALIDATE_SECRET env var
 #     APP_URL (optional) = production base URL; otherwise edit the default below
-#
-# NOTE: cron requests every 2 minutes, but GitHub Actions enforces a ~5-minute
-# minimum for scheduled workflows and may delay further under load — so real
-# cadence is roughly every 5 min. The 60s in-page client poll covers viewers in
-# real time; this job keeps the DB fresh for everyone else. For a guaranteed
-# 2-min cadence use an external pinger (e.g. cron-job.org) against the same URL.
 
 on:
-  schedule:
-    # Every 2 min during June 11-30 and July 1-19 (UTC). Cron has no year field;
-    # the job guards on the 2026 window below.
-    - cron: "*/2 * 11-30 6 *"
-    - cron: "*/2 * 1-19 7 *"
-  workflow_dispatch: # allow manual runs for testing
+  # schedule:  # disabled — cron-job.org drives live refresh (see note above)
+  #   - cron: "*/2 * 11-30 6 *"
+  #   - cron: "*/2 * 1-19 7 *"
+  workflow_dispatch: # manual runs for testing
 
 concurrency:
   group: live-refresh

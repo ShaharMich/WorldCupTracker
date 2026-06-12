@@ -27,6 +27,7 @@ import type {
   AFTransferResponse,
   AFStandingEntry,
 } from "@/types/api";
+import type { WCStats, WCMatchStat } from "@/types/player";
 
 // API-Football Pro plan = 7,500 req/day; a small pause keeps us well-behaved.
 const RATE_LIMIT_MS = 150;
@@ -821,12 +822,13 @@ export async function seedWCPlayerStats(log: Logger = noop): Promise<void> {
     red: number;
     ratingSum: number;
     ratingMin: number;
+    matches: WCMatchStat[];
   };
   const agg = new Map<number, Agg>();
   const get = (id: number): Agg => {
     let a = agg.get(id);
     if (!a) {
-      a = { appearances: 0, lineups: 0, minutes: 0, goals: 0, assists: 0, yellow: 0, red: 0, ratingSum: 0, ratingMin: 0 };
+      a = { appearances: 0, lineups: 0, minutes: 0, goals: 0, assists: 0, yellow: 0, red: 0, ratingSum: 0, ratingMin: 0, matches: [] };
       agg.set(id, a);
     }
     return a;
@@ -837,24 +839,44 @@ export async function seedWCPlayerStats(log: Logger = noop): Promise<void> {
     try {
       const entries = await fetchFixturePlayers(f.fixture.id);
       for (const entry of entries) {
+        // The opponent is whichever side of the fixture isn't this entry's team.
+        const isHome = entry.team.id === f.teams.home.id;
+        const opp = isHome ? f.teams.away : f.teams.home;
         for (const p of entry.players) {
           const st = p.statistics?.[0];
           if (!st) continue;
           const mins = st.games?.minutes ?? 0;
           if (mins <= 0) continue; // unused subs have null/0 minutes — didn't play
+          const goals = st.goals?.total ?? 0;
+          const assists = st.goals?.assists ?? 0;
+          const yellow = st.cards?.yellow ?? 0;
+          const red = st.cards?.red ?? 0;
+          const r = st.games?.rating ? Number(st.games.rating) : NaN;
           const a = get(p.player.id);
           a.appearances += 1;
           if (st.games?.substitute === false) a.lineups += 1;
           a.minutes += mins;
-          a.goals += st.goals?.total ?? 0;
-          a.assists += st.goals?.assists ?? 0;
-          a.yellow += st.cards?.yellow ?? 0;
-          a.red += st.cards?.red ?? 0;
-          const r = st.games?.rating ? Number(st.games.rating) : NaN;
+          a.goals += goals;
+          a.assists += assists;
+          a.yellow += yellow;
+          a.red += red;
           if (Number.isFinite(r)) {
             a.ratingSum += r * mins;
             a.ratingMin += mins;
           }
+          a.matches.push({
+            fixture_id: f.fixture.id,
+            date: f.fixture.date,
+            opponent: opp.name,
+            opponent_id: opp.id,
+            home: isHome,
+            minutes: mins,
+            goals,
+            assists,
+            yellow_cards: yellow,
+            red_cards: red,
+            rating: Number.isFinite(r) ? r.toFixed(1) : null,
+          });
         }
       }
     } catch (e) {
@@ -865,7 +887,7 @@ export async function seedWCPlayerStats(log: Logger = noop): Promise<void> {
   log(`Aggregated WC stats for ${agg.size} players. Writing to Supabase...`);
   let updated = 0;
   for (const [id, a] of agg) {
-    const stats_wc = {
+    const stats_wc: WCStats = {
       appearances: a.appearances,
       lineups: a.lineups,
       minutes: a.minutes,
@@ -874,6 +896,8 @@ export async function seedWCPlayerStats(log: Logger = noop): Promise<void> {
       yellow_cards: a.yellow,
       red_cards: a.red,
       rating: a.ratingMin > 0 ? (a.ratingSum / a.ratingMin).toFixed(2) : null,
+      // Newest match first, so the profile lists the most recent game at the top.
+      matches: a.matches.slice().sort((x, y) => y.date.localeCompare(x.date)),
     };
     const { error } = await db
       .from("players")

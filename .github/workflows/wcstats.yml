@@ -1,25 +1,29 @@
 name: Seed WC stats
 
 # Aggregates WC 2026 player stats (and match results) by hitting the app's seed
-# endpoint every 30 minutes during the tournament. GitHub-hosted runners are free
-# for this, so it replaces the Vercel cron.
+# endpoint (step=wcstats) during the tournament — this is what keeps /stats and
+# the player-profile WC sections self-updating after each match.
 #
-# Setup (one-time):
-#   1. Repo Settings -> Secrets and variables -> Actions -> New repository secret:
-#        REVALIDATE_SECRET  = the same value as the app's REVALIDATE_SECRET env var
-#        APP_URL (optional) = production base URL; otherwise edit the default below
-#   2. Scheduled workflows only run from the repo's DEFAULT branch, and GitHub may
-#      delay them under load. They also auto-disable after 60 days of repo
-#      inactivity — re-enable from the Actions tab if that happens.
+# ⚠️ SCHEDULE DISABLED (2026-06-12): like the live-refresh workflow, this cron was
+# failing every run because the REVALIDATE_SECRET Actions secret isn't set, and
+# the failures emailed on a 30-min cadence. Automation has moved to an external
+# pinger (cron-job.org) hitting POST /api/seed?step=wcstats every 30 min with the
+# `Authorization: Bearer <REVALIDATE_SECRET>` header — the same setup already in
+# use for step=live. The schedule is removed; the job is kept as
+# workflow_dispatch-only for manual testing. To restore GitHub-driven runs, add
+# the REVALIDATE_SECRET (and optional APP_URL) Actions secrets and re-add the
+# cron block below.
+#
+# Setup for manual dispatch:
+#   Repo Settings -> Secrets and variables -> Actions:
+#     REVALIDATE_SECRET  = the same value as the app's REVALIDATE_SECRET env var
+#     APP_URL (optional) = production base URL; otherwise edit the default below
 
 on:
-  schedule:
-    # Cron has no year field, so the months/days below also match in other years;
-    # the job step guards against that by checking the 2026 date window. Every
-    # 30 min during June 11-30 and July 1-19 (times are UTC).
-    - cron: "*/30 * 11-30 6 *"
-    - cron: "*/30 * 1-19 7 *"
-  workflow_dispatch: # allow manual runs for testing
+  # schedule:  # disabled — cron-job.org drives wcstats (see note above)
+  #   - cron: "*/30 * 11-30 6 *"
+  #   - cron: "*/30 * 1-19 7 *"
+  workflow_dispatch: # manual runs for testing
 
 concurrency:
   group: wcstats

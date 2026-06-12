@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Mode = "time" | "datetime" | "day";
+type Mode = "time" | "datetime" | "day" | "date";
 
 function format(utc: string, mode: Mode, timeZone?: string): string {
   const opts: Intl.DateTimeFormatOptions =
@@ -10,7 +10,9 @@ function format(utc: string, mode: Mode, timeZone?: string): string {
       ? { hour: "numeric", minute: "2-digit" }
       : mode === "day"
         ? { weekday: "long", month: "long", day: "numeric", year: "numeric" }
-        : { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
+        : mode === "date"
+          ? { month: "short", day: "numeric" }
+          : { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
   if (timeZone) opts.timeZone = timeZone;
   // Locale pinned to en-US only for the deterministic SSR / first-paint value so
   // hydration matches; the post-mount render uses the visitor's own locale.

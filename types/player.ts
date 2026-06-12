@@ -19,6 +19,28 @@ export interface ClubSeasonStats {
   rating: string | null;
 }
 
+// One World Cup 2026 match's stat line for a player (used for the per-match
+// breakdown on the player profile). Sourced from /fixtures/players per fixture.
+export interface WCMatchStat {
+  fixture_id: number;
+  date: string; // ISO kickoff
+  opponent: string;
+  opponent_id: number | null;
+  home: boolean; // was the player's team the home side?
+  minutes: number;
+  goals: number;
+  assists: number;
+  yellow_cards: number;
+  red_cards: number;
+  rating: string | null;
+}
+
+// WC 2026 tournament stats: the aggregated totals (same shape as a season) plus
+// an optional newest-first per-match breakdown.
+export interface WCStats extends ClubSeasonStats {
+  matches?: WCMatchStat[];
+}
+
 export interface Player {
   id: number;
   name: string;
@@ -38,7 +60,7 @@ export interface Player {
   club_logo_url: string | null;
   club_country: string | null;
   stats_club_season: ClubSeasonStats | null;
-  stats_wc: ClubSeasonStats | null;
+  stats_wc: WCStats | null;
   career_clubs: CareerClub[] | null;
   national_team_caps: number | null;
   national_team_goals: number | null;
