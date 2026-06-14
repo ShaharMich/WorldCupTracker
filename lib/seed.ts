@@ -774,11 +774,15 @@ export async function seedStandings(log: Logger = noop): Promise<void> {
   // ids via the crosswalk so they satisfy the standings.team_id -> teams.id FK.
   // Unmatched entries are skipped rather than crashing the upsert.
   const { fdByAf } = await buildTeamCrosswalk(log);
+  // API-Football returns extra summary tables alongside the 12 groups (e.g.
+  // "Ranking of third-placed teams", "Stage"). Keep only real group codes (A–L)
+  // so those junk tables don't render as bogus cards on /groups.
   const rows = league.standings.flatMap((group) =>
     group.flatMap((entry) => {
       const fdId = fdByAf.get(entry.team.id);
       if (!fdId) return [];
-      const code = entry.group?.replace(/^Group\s+/i, "").trim() || "?";
+      const code = entry.group?.replace(/^Group\s+/i, "").trim() ?? "";
+      if (!/^[A-L]$/.test(code)) return [];
       return [mapStanding(entry, code, fdId)];
     }),
   );
