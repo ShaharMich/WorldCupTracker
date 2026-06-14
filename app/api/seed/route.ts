@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { runSeed, type SeedOptions } from "@/lib/seed";
 import { isServerSupabaseConfigured } from "@/lib/supabase/server";
 
@@ -112,14 +112,19 @@ export async function POST(req: Request) {
     live: runAll || steps.includes("live"),
   };
 
-  const logs: string[] = [];
-  try {
-    await runSeed(opts, (m) => logs.push(m));
-    return NextResponse.json({ ok: true, logs });
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: (e as Error).message, logs },
-      { status: 500 },
-    );
-  }
+  // cron-job.org caps each ping at 30s, but a wcstats/players seed can take far
+  // longer. Acknowledge immediately (202) and run the seed in after(), which on
+  // Vercel keeps the function alive past the response (up to maxDuration above).
+  // Logs go to the platform console since the caller no longer waits for them.
+  const requested = steps.includes(ALL_STEPS) ? ["all"] : steps;
+  after(async () => {
+    try {
+      await runSeed(opts, (m) => console.log(`[seed:${requested.join(",")}] ${m}`));
+      console.log(`[seed:${requested.join(",")}] complete`);
+    } catch (e) {
+      console.error(`[seed:${requested.join(",")}] failed:`, (e as Error).message);
+    }
+  });
+
+  return NextResponse.json({ ok: true, accepted: requested }, { status: 202 });
 }
