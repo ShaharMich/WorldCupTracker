@@ -18,6 +18,7 @@ import {
 } from "@/lib/api/football-data";
 import { venueForMatch } from "@/lib/venues";
 import { fifaRankFor } from "@/lib/fifa-rankings";
+import { R32_SLOTS, THIRD_PLACE_ALLOCATION, type Slot } from "@/lib/knockout-bracket";
 import { refreshMatch } from "@/lib/live";
 import { isLiveStatus, LIVE_STATUSES } from "@/types/match";
 import { sleep } from "@/lib/utils";
@@ -797,6 +798,135 @@ export async function seedStandings(log: Logger = noop): Promise<void> {
   log(`Upserted ${rows.length} standings rows.`);
 }
 
+// Derives the Round-of-32 matchups from the current group standings and writes
+// the resolved home/away team ids onto the knockout matches — so the bracket
+// fills in as each group concludes, instead of waiting for football-data to
+// publish the official draw. Uses the official FIFA bracket structure +Annex C
+// third-place allocation (lib/knockout-bracket.ts).
+//
+// Gating keeps it correct: a group's winner/runner-up are written only once that
+// group is complete (all four teams have played their three games, so ranks are
+// final); the eight best-third slots are written only once ALL twelve groups are
+// complete (the qualifying eight thirds aren't knowable before then). We only
+// ever fill a currently-null slot on a not-yet-started match, so we never clobber
+// the official draw football-data eventually supplies, nor any live/finished row.
+// Idempotent: re-run after each group concludes.
+export async function seedKnockoutBracket(log: Logger = noop): Promise<void> {
+  const db = getServerSupabase();
+  log("Deriving Round-of-32 bracket from standings...");
+
+  const { data: stData, error: stErr } = await db
+    .from("standings")
+    .select("group_code,team_id,rank,played,points,goal_difference,goals_for");
+  if (stErr) throw new Error(`standings lookup failed: ${stErr.message}`);
+  const standings = (stData ?? []).filter((r) => /^[A-L]$/.test(r.group_code as string));
+  if (standings.length === 0) {
+    log("No standings yet — nothing to derive.");
+    return;
+  }
+
+  const byGroup = new Map<string, typeof standings>();
+  for (const r of standings) {
+    const g = r.group_code as string;
+    if (!byGroup.has(g)) byGroup.set(g, []);
+    byGroup.get(g)!.push(r);
+  }
+
+  const winners = new Map<string, number>();
+  const runners = new Map<string, number>();
+  const thirdTeamByGroup = new Map<string, number>();
+  type Third = { group: string; team_id: number; points: number; gd: number; gf: number };
+  const thirds: Third[] = [];
+  let completeGroups = 0;
+
+  for (const [g, rows] of byGroup) {
+    // A group is decided once all four teams have completed their three matches.
+    const complete = rows.length >= 4 && rows.every((r) => (r.played ?? 0) >= 3);
+    if (!complete) continue;
+    completeGroups++;
+    const at = (rank: number) => rows.find((r) => r.rank === rank);
+    const w = at(1)?.team_id as number | undefined;
+    const ru = at(2)?.team_id as number | undefined;
+    const th = at(3);
+    if (w != null) winners.set(g, w);
+    if (ru != null) runners.set(g, ru);
+    if (th?.team_id != null) {
+      thirdTeamByGroup.set(g, th.team_id as number);
+      thirds.push({
+        group: g,
+        team_id: th.team_id as number,
+        points: (th.points as number) ?? 0,
+        gd: (th.goal_difference as number) ?? 0,
+        gf: (th.goals_for as number) ?? 0,
+      });
+    }
+  }
+
+  // The eight best third-placed teams (and thus the Annex C allocation) are only
+  // determinable once every group is complete. FIFA ranks thirds by points, then
+  // goal difference, then goals for; we apply the same, with the group letter as
+  // a deterministic final fallback (the further FIFA tiebreaks — disciplinary
+  // points, drawing of lots — aren't available from the standings feed).
+  let thirdByWinnerGroup: Record<string, number> | null = null;
+  if (completeGroups === 12 && thirds.length === 12) {
+    const best8 = thirds
+      .slice()
+      .sort(
+        (a, b) =>
+          b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.group.localeCompare(b.group),
+      )
+      .slice(0, 8);
+    const comboKey = best8.map((t) => t.group).sort().join("");
+    const alloc = THIRD_PLACE_ALLOCATION[comboKey];
+    if (!alloc) {
+      log(`No Annex C entry for third-place combo "${comboKey}" — leaving 3rd slots as TBD.`);
+    } else {
+      thirdByWinnerGroup = {};
+      for (const [winnerGroup, thirdGroup] of Object.entries(alloc)) {
+        const tid = thirdTeamByGroup.get(thirdGroup);
+        if (tid != null) thirdByWinnerGroup[winnerGroup] = tid;
+      }
+    }
+  }
+
+  const resolve = (slot: Slot): number | null => {
+    if (slot.kind === "winner") return winners.get(slot.group) ?? null;
+    if (slot.kind === "runnerup") return runners.get(slot.group) ?? null;
+    return thirdByWinnerGroup?.[slot.winnerGroup] ?? null; // third
+  };
+
+  const ids = Object.keys(R32_SLOTS).map(Number);
+  const { data: curData, error: curErr } = await db
+    .from("matches")
+    .select("id,home_team_id,away_team_id,status")
+    .in("id", ids);
+  if (curErr) throw new Error(`knockout matches lookup failed: ${curErr.message}`);
+  const curById = new Map((curData ?? []).map((m) => [m.id as number, m]));
+
+  let updated = 0;
+  for (const [idStr, slot] of Object.entries(R32_SLOTS)) {
+    const id = Number(idStr);
+    const row = curById.get(id);
+    if (!row) continue;
+    if (row.status && row.status !== "NS") continue; // never touch a started/finished match
+    const patch: Record<string, number> = {};
+    const home = resolve(slot.home);
+    const away = resolve(slot.away);
+    if (home != null && row.home_team_id == null) patch.home_team_id = home;
+    if (away != null && row.away_team_id == null) patch.away_team_id = away;
+    if (Object.keys(patch).length === 0) continue;
+    const { error } = await db.from("matches").update(patch).eq("id", id);
+    if (error) throw new Error(`bracket update for match ${id} failed: ${error.message}`);
+    updated++;
+  }
+
+  log(
+    `Knockout bracket: ${completeGroups}/12 groups complete; ` +
+      `updated ${updated} Round-of-32 match(es)` +
+      `${thirdByWinnerGroup ? " (incl. third-place slots)" : ""}.`,
+  );
+}
+
 // Aggregates each player's World Cup 2026 tournament stats from finished WC
 // fixtures and writes them to players.stats_wc. Iterates API-Football fixtures
 // directly (league=1, season=2026) so fixture + player ids stay in API-Football
@@ -1010,6 +1140,7 @@ export interface SeedOptions {
   coaches?: boolean;
   rankings?: boolean;
   standings?: boolean;
+  bracket?: boolean;
   wcstats?: boolean;
   live?: boolean;
 }
@@ -1023,6 +1154,7 @@ export async function runSeed(
     coaches: true,
     rankings: true,
     standings: true,
+    bracket: true,
     wcstats: true,
     live: true,
   },
@@ -1035,6 +1167,10 @@ export async function runSeed(
   if (opts.players) await seedPlayersFromApiFootball(log);
   if (opts.coaches) await seedCoaches(log);
   if (opts.standings) await seedStandings(log);
+  // The bracket derives from standings, so run it whenever standings refresh
+  // (or when requested on its own). This is why the cron `standings` step keeps
+  // the Round-of-32 filled without a separate token.
+  if (opts.bracket || opts.standings) await seedKnockoutBracket(log);
   if (opts.wcstats) await seedWCPlayerStats(log);
   if (opts.live) await seedLiveMatches(log);
   log("Seed complete.");

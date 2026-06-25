@@ -13,6 +13,7 @@ const STEP_NAMES = [
   "coaches",
   "rankings",
   "standings",
+  "bracket",
   "wcstats",
   "live",
 ] as const;
@@ -108,6 +109,7 @@ export async function POST(req: Request) {
     coaches: runAll || steps.includes("coaches"),
     rankings: runAll || steps.includes("rankings"),
     standings: runAll || steps.includes("standings"),
+    bracket: runAll || steps.includes("bracket"),
     wcstats: runAll || steps.includes("wcstats"),
     live: runAll || steps.includes("live"),
   };
