@@ -388,9 +388,29 @@ export async function seedFixtures(log: Logger = noop): Promise<void> {
     log("No fixtures returned yet.");
     return;
   }
-  const { error } = await db.from("matches").upsert(rows, { onConflict: "id" });
-  if (error) throw new Error(`matches upsert failed: ${error.message}`);
-  log(`Upserted ${rows.length} fixtures.`);
+
+  // football-data serves knockout fixtures with null teams until it publishes the
+  // draw. We must NOT let those nulls overwrite teams we've already derived from
+  // the standings (seedKnockoutBracket) — a standalone `fixtures` run would wipe
+  // the bracket otherwise. Split the upsert: rows with both teams known carry the
+  // team-id columns; rows missing a team omit those columns entirely so the
+  // existing values are preserved. (football-data gives both teams or neither, so
+  // dropping both is safe.) Everything else — status, scores, kickoff, venue —
+  // still updates for every row.
+  const full = rows.filter((r) => r.home_team_id != null && r.away_team_id != null);
+  const partial = rows
+    .filter((r) => r.home_team_id == null || r.away_team_id == null)
+    .map(({ home_team_id: _h, away_team_id: _a, ...rest }) => rest);
+
+  if (full.length > 0) {
+    const { error } = await db.from("matches").upsert(full, { onConflict: "id" });
+    if (error) throw new Error(`matches upsert failed: ${error.message}`);
+  }
+  if (partial.length > 0) {
+    const { error } = await db.from("matches").upsert(partial, { onConflict: "id" });
+    if (error) throw new Error(`matches (partial) upsert failed: ${error.message}`);
+  }
+  log(`Upserted ${rows.length} fixtures (${partial.length} with teams preserved).`);
 }
 
 // Crosswalks our football-data fixtures to API-Football fixture ids and stores

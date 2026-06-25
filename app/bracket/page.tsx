@@ -2,6 +2,7 @@ import { BracketMatch } from "@/components/bracket/BracketMatch";
 import { SetupNotice } from "@/components/EmptyState";
 import { getKnockoutMatches } from "@/lib/queries";
 import type { MatchWithTeams } from "@/types/match";
+import { BRACKET_LAYOUT } from "@/lib/knockout-bracket";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
@@ -10,12 +11,6 @@ export const metadata = pageMetadata({
   path: "/bracket",
 });
 export const revalidate = 60;
-
-// Splits a round's matches into [leftHalf, rightHalf] for the two-sided bracket.
-function half<T>(arr: T[]): [T[], T[]] {
-  const mid = Math.ceil(arr.length / 2);
-  return [arr.slice(0, mid), arr.slice(mid)];
-}
 
 function Column({ label, matches }: { label: string; matches: MatchWithTeams[] }) {
   if (matches.length === 0) return null;
@@ -45,19 +40,23 @@ export default async function BracketPage() {
     );
   }
 
-  const byStage = new Map<string, MatchWithTeams[]>();
-  for (const m of matches) {
-    const key = m.stage ?? "?";
-    if (!byStage.has(key)) byStage.set(key, []);
-    byStage.get(key)!.push(m);
-  }
+  // Order each column by the actual bracket topology (lib/knockout-bracket.ts),
+  // not by kickoff — kickoff order interleaves the two halves and would put a
+  // group's winner and runner-up on the same visual side.
+  const byId = new Map(matches.map((m) => [m.id, m]));
+  const pick = (ids: readonly number[]): MatchWithTeams[] =>
+    ids.map((id) => byId.get(id)).filter((m): m is MatchWithTeams => m != null);
 
-  const [r32L, r32R] = half(byStage.get("Round of 32") ?? []);
-  const [r16L, r16R] = half(byStage.get("Round of 16") ?? []);
-  const [qfL, qfR] = half(byStage.get("Quarter-final") ?? []);
-  const [sfL, sfR] = half(byStage.get("Semi-final") ?? []);
-  const final = byStage.get("Final") ?? [];
-  const third = byStage.get("Third-place Play-off") ?? [];
+  const r32L = pick(BRACKET_LAYOUT.left.r32);
+  const r32R = pick(BRACKET_LAYOUT.right.r32);
+  const r16L = pick(BRACKET_LAYOUT.left.r16);
+  const r16R = pick(BRACKET_LAYOUT.right.r16);
+  const qfL = pick(BRACKET_LAYOUT.left.qf);
+  const qfR = pick(BRACKET_LAYOUT.right.qf);
+  const sfL = pick(BRACKET_LAYOUT.left.sf);
+  const sfR = pick(BRACKET_LAYOUT.right.sf);
+  const final = matches.filter((m) => m.stage === "Final");
+  const third = matches.filter((m) => m.stage === "Third-place Play-off");
 
   return (
     <div className="mx-auto max-w-[110rem] px-4 py-8">

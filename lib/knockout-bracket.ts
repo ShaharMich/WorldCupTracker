@@ -37,6 +37,30 @@ export const R32_SLOTS: Record<number, { home: Slot; away: Slot }> = {
   537428: { home: { kind: "runnerup", group: "D" }, away: { kind: "runnerup", group: "G" } }, // Match 88
 };
 
+// Topological layout of the symmetrical two-sided bracket, as football-data match
+// ids in top-to-bottom order within each column. `left` is the Final's upper
+// subtree (everything feeding Semi-final Match 101), `right` is the lower subtree
+// (feeding Match 102). This is the actual knockout tree — NOT kickoff order, which
+// interleaves the two halves and would wrongly place a group's winner and runner-up
+// on the same visual side. Derived from the official FIFA bracket and verified by
+// matching each match's kickoff to the FIFA schedule (Matches 73–102). The Final
+// (Match 104) and third-place play-off (Match 103) are the single centre matches,
+// located by stage, so they aren't listed here.
+export const BRACKET_LAYOUT = {
+  left: {
+    r32: [537415, 537416, 537417, 537418, 537419, 537420, 537421, 537422], // M74 M77 M73 M75 M83 M84 M81 M82
+    r16: [537375, 537376, 537379, 537380], // M89 M90 M93 M94
+    qf: [537383, 537384], // M97 M98
+    sf: [537387], // M101
+  },
+  right: {
+    r32: [537423, 537424, 537425, 537426, 537427, 537428, 537429, 537430], // M76 M78 M79 M80 M86 M88 M85 M87
+    r16: [537377, 537378, 537381, 537382], // M91 M92 M95 M96
+    qf: [537385, 537386], // M99 M100
+    sf: [537388], // M102
+  },
+} as const;
+
 // Annex C best-third allocation. Key = the eight groups whose third-placed team
 // qualified, as an alphabetically-sorted string (e.g. "ABCEFHIK"). Value maps
 // each group winner that faces a third (A, B, D, E, G, I, K, L) to the group
