@@ -1,6 +1,6 @@
 # WC 2026 Tracker
 
-A public, mobile-first web app for following the **FIFA World Cup 2026** in full detail — all 48 national teams, complete squad rosters with player stats, every one of the 104 fixtures, live scores, group standings, and the full knockout bracket.
+A public, mobile-first web app for following the **FIFA World Cup 2026** in full detail, all 48 national teams, complete squad rosters with player stats, every one of the 104 fixtures, live scores, group standings, and the full knockout bracket.
 
 **Live:** [trackwc2026.vercel.app](https://trackwc2026.vercel.app)
 
