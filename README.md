@@ -24,24 +24,6 @@ A public, mobile-first web app for following the **FIFA World Cup 2026** in full
 - **Deployment:** Vercel
 - **Mobile (planned):** Capacitor wrap of the Next.js app
 
-## Getting Started
-
-Create a `.env.local` at the project root (see `.env.local.example`) with your Supabase and football API credentials, then run the Supabase schema in `supabase/schema.sql`.
-
-```bash
-npm install
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) to view the app.
-
-### Seeding data
-
-```bash
-npm run seed                      # all steps
-npm run seed -- teams fixtures    # a subset of steps
-```
-
 ## License
 
 This project is for educational and non-commercial use.
